@@ -9,6 +9,8 @@ final class Store: ObservableObject {
     @Published var syncing = false
 
     let syncManager = SyncManager()
+    let keepAwake = KeepAwake()
+    let sitReminder = SitReminder()
     var autoSyncTimer: Timer?
 
     @AppStorage("showAllDevices") var showAllDevices = true
@@ -77,6 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.animates = true
 
         store.refresh()
+        store.sitReminder.updateRunning()
         timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             self?.store.refresh()
         }
@@ -111,6 +114,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             s.append(NSAttributedString(attachment: att))
             s.append(NSAttributedString(string: " " + value,
                 attributes: [.font: font, .baselineOffset: 1, .foregroundColor: color]))
+        }
+
+        if store.keepAwake.active {
+            let cfg = NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+                .applying(NSImage.SymbolConfiguration(paletteColors: [Self.claudeColor]))
+            let img = NSImage(systemSymbolName: "cup.and.saucer.fill", accessibilityDescription: nil)?
+                .withSymbolConfiguration(cfg)
+            img?.isTemplate = false
+            let att = NSTextAttachment(); att.image = img
+            s.append(NSAttributedString(attachment: att))
         }
 
         if let u = store.usage {
@@ -161,6 +174,55 @@ enum Shot {
         }
         exit(0)
     }
+}
+
+// 品牌 Logo(用于 app icon / 通知图标):珊瑚渐变 squircle + 白色时计符号。
+struct LogoView: View {
+    var body: some View {
+        ZStack {
+            ZStack {
+                RoundedRectangle(cornerRadius: 185, style: .continuous)
+                    .fill(LinearGradient(colors: [
+                        Color(red: 0.97, green: 0.64, blue: 0.50),
+                        Color(red: 0.90, green: 0.46, blue: 0.37),
+                        Color(red: 0.82, green: 0.38, blue: 0.33)],
+                        startPoint: .top, endPoint: .bottom))
+                RoundedRectangle(cornerRadius: 185, style: .continuous)
+                    .fill(LinearGradient(colors: [.white.opacity(0.28), .clear],
+                        startPoint: .top, endPoint: .center))
+                Image(systemName: "timer")
+                    .font(.system(size: 440, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.20), radius: 22, y: 10)
+            }
+            .frame(width: 824, height: 824)
+            .shadow(color: .black.opacity(0.28), radius: 34, y: 20)
+        }
+        .frame(width: 1024, height: 1024)
+    }
+}
+
+enum Icon {
+    static func run(path: String) {
+        _ = NSApplication.shared
+        MainActor.assumeIsolated {
+            let r = ImageRenderer(content: LogoView())
+            r.scale = 1
+            if let cg = r.cgImage {
+                let rep = NSBitmapImageRep(cgImage: cg)
+                if let png = rep.representation(using: .png, properties: [:]) {
+                    try? png.write(to: URL(fileURLWithPath: path))
+                }
+            }
+        }
+        exit(0)
+    }
+}
+
+if let idx = CommandLine.arguments.firstIndex(of: "--make-icon") {
+    let out = CommandLine.arguments.count > idx + 1
+        ? CommandLine.arguments[idx + 1] : "/tmp/tokei_icon.png"
+    Icon.run(path: out)
 }
 
 if let idx = CommandLine.arguments.firstIndex(of: "--shot") {

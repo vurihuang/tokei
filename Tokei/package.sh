@@ -19,6 +19,7 @@ cp "$BIN" "$APP/Contents/MacOS/Tokei"
 cp "$PROJ_DIR/usage.30s.py" "$APP/Contents/Resources/"
 [ -f "$PROJ_DIR/pricing.json" ] && cp "$PROJ_DIR/pricing.json" "$APP/Contents/Resources/"
 [ -f "$PROJ_DIR/pricing_overrides.json" ] && cp "$PROJ_DIR/pricing_overrides.json" "$APP/Contents/Resources/"
+[ -f "AppIcon.icns" ] && cp "AppIcon.icns" "$APP/Contents/Resources/"
 
 # Info.plist
 cat > "$APP/Contents/Info.plist" <<'PLIST'
@@ -33,6 +34,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleShortVersionString</key><string>1.0</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleExecutable</key><string>Tokei</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>

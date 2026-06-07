@@ -1,5 +1,4 @@
 import SwiftUI
-import Charts
 
 struct DailyCost: Codable, Identifiable {
     var date: String
@@ -8,8 +7,13 @@ struct DailyCost: Codable, Identifiable {
     var total: Double
     var c_in: Int = 0
     var c_out: Int = 0
+    var c_cr: Int = 0
+    var c_cw: Int = 0
     var x_in: Int = 0
     var x_out: Int = 0
+    var x_cached: Int = 0
+    var x_reason: Int = 0
+    var tokens: Int = 0
     var id: String { date }
 }
 
@@ -19,6 +23,9 @@ struct ModelCost: Codable, Identifiable {
     var tool: String
     var `in`: Int?
     var out: Int?
+    var cr: Int?
+    var cw: Int?
+    var tokens: Int?
     var cost_per_k: Double = 0
     var out_ratio: Double = 0
     var id: String { name }
@@ -32,23 +39,27 @@ struct DashboardData: Codable {
 struct DashboardView: View {
     @State private var daily: [DailyCost] = []
     @State private var models: [ModelCost] = []
+    @State private var wrapped: WrappedData? = nil
     @State private var loading = true
+    @AppStorage("hideProjects") private var hideProjects = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             if loading {
                 HStack { Spacer(); ProgressView().controlSize(.small); Spacer() }
                     .frame(height: 200)
-            } else if daily.isEmpty {
-                HStack { Spacer(); Text("暂无数据").font(.system(size: 14)).foregroundStyle(Theme.tTertiary); Spacer() }
-                    .frame(height: 200)
             } else {
-                summaryCards
-                modelSection
-                Divider().opacity(0.15)
-                trendSection
-                Divider().opacity(0.15)
-                heatmapSection
+                if let w = wrapped, w.total_tokens > 0 { WrappedView(data: w) }
+                if !daily.isEmpty {
+                    Divider().opacity(0.15)
+                    modelSection
+                    if let w = wrapped, !w.projects.isEmpty {
+                        Divider().opacity(0.15)
+                        projectsSection(w.projects)
+                    }
+                    Divider().opacity(0.15)
+                    heatmapSection
+                }
             }
         }
         .onAppear { loadData() }
@@ -56,199 +67,64 @@ struct DashboardView: View {
 
     // MARK: - Summary
 
-    var summaryCards: some View {
-        let totalCost = daily.reduce(0) { $0 + $1.total }
-        let totalTokens = daily.reduce(0) { $0 + $1.c_in + $1.c_out + $1.x_in + $1.x_out }
-        let avgCost = daily.isEmpty ? 0 : totalCost / Double(daily.count)
-        let maxDay = daily.max(by: { $0.total < $1.total })
-        return HStack(spacing: 10) {
-            sumCard("总成本", "$" + NumberFormatter.localizedString(from: NSNumber(value: Int(totalCost)), number: .decimal), Theme.claude)
-            sumCard("总 Token", Fmt.human(totalTokens), Theme.codex)
-            sumCard("日均", String(format: "$%.0f", avgCost), Theme.gemini)
-            if let m = maxDay {
-                sumCard("峰值", String(format: "$%.0f", m.total), Color.red.opacity(0.8))
-            }
-        }
-    }
-
-    func sumCard(_ label: String, _ value: String, _ tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.system(size: 9, weight: .medium)).foregroundStyle(tint.opacity(0.9))
-            Text(value).font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(.white)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 7).padding(.horizontal, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(LinearGradient(colors: [tint.opacity(0.12), tint.opacity(0.04)],
-                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(LinearGradient(colors: [tint.opacity(0.30), tint.opacity(0.05)],
-                                                 startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 0.75))
-        )
-    }
-
     // MARK: - Model Chart
 
     var modelSection: some View {
-        let sorted = models.sorted { (($0.in ?? 0) + ($0.out ?? 0)) > (($1.in ?? 0) + ($1.out ?? 0)) }
+        let sorted = models.sorted { ($0.tokens ?? 0) > ($1.tokens ?? 0) }
         let top = Array(sorted.prefix(8))
-        let maxTokens = Double((top.first.map { ($0.in ?? 0) + ($0.out ?? 0) }) ?? 1)
-        let maxCost = models.map(\.cost).max() ?? 1
-        return VStack(alignment: .leading, spacing: 5) {
-            Text("模型用量").font(.system(size: 14, weight: .bold))
+        let maxTokens = Double(top.first?.tokens ?? 1)
+        return VStack(alignment: .leading, spacing: 9) {
+            Text("模型用量").font(.system(size: 13, weight: .bold))
             ForEach(top) { m in
-                let tokens = (m.in ?? 0) + (m.out ?? 0)
-                let tint = m.tool == "codex" ? Theme.codex : Theme.claude
-                let costRatio = m.cost / maxCost
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
-                        Text(m.name)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Theme.tPrimary)
-                        Spacer()
-                        Text(Fmt.human(tokens) + " tok")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(Theme.tSecondary)
-                        Text("·")
-                            .foregroundStyle(Theme.tTertiary)
-                        Text(String(format: "$%.0f", m.cost))
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
-                            .foregroundStyle(costRatio > 0.5 ? .white : Theme.tSecondary)
-                    }
-                    GeometryReader { geo in
-                        let logVal = tokens > 0 ? log10(Double(tokens)) : 0
-                        let logMax = maxTokens > 0 ? log10(maxTokens) : 1
-                        let ratio = logMax > 0 ? logVal / logMax : 0
-                        let w = max(4, geo.size.width * CGFloat(ratio))
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .fill(tint.opacity(0.08))
-                                .frame(width: geo.size.width)
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .fill(LinearGradient(
-                                    colors: [tint.opacity(0.6), tint, tint.opacity(0.8 + costRatio * 0.2)],
-                                    startPoint: .leading, endPoint: .trailing))
-                                .frame(width: w)
-                                .shadow(color: tint.opacity(0.35), radius: 4)
-                        }
-                    }
-                    .frame(height: 10)
-                }
+                StatBar(name: m.name,
+                        tokens: m.tokens ?? ((m.in ?? 0) + (m.out ?? 0)),
+                        cost: m.cost, maxTokens: maxTokens,
+                        tint: m.tool == "codex" ? Theme.codex : Theme.claude)
             }
         }
     }
 
-    // MARK: - Trend
-
-    @State private var trendDays = 30
-
-    var trendSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("日均趋势").font(.system(size: 14, weight: .bold))
-                Spacer()
-                Picker("", selection: $trendDays) {
-                    Text("14天").tag(14); Text("30天").tag(30); Text("90天").tag(90)
+    // MARK: - Projects
+    func projectsSection(_ projects: [WrappedProject]) -> some View {
+        let maxTok = Double(projects.first?.tokens ?? 1)
+        return VStack(alignment: .leading, spacing: 9) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) { hideProjects.toggle() }
+            } label: {
+                HStack(spacing: 5) {
+                    Text("项目排行").font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.tPrimary)
+                    Image(systemName: hideProjects ? "eye.slash.fill" : "eye")
+                        .font(.system(size: 9)).foregroundStyle(Theme.tTertiary)
+                    Spacer()
+                    Image(systemName: hideProjects ? "chevron.down" : "chevron.up")
+                        .font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.tTertiary)
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 140)
-                .controlSize(.mini)
+                .contentShape(Rectangle())
             }
-            trendChart
-        }
-    }
-
-    var trendChart: some View {
-        let slice = Array(daily.suffix(trendDays))
-        let ma7 = movingAverage(slice, window: 7)
-        let step = max(1, slice.count / 5)
-        let labelDates = Set(stride(from: 0, to: slice.count, by: step).map { slice[$0].date }
-                             + [slice.last?.date ?? ""])
-
-        return Chart {
-            ForEach(Array(slice.enumerated()), id: \.offset) { i, d in
-                BarMark(
-                    x: .value("日期", d.date),
-                    y: .value("成本", d.total)
-                )
-                .foregroundStyle(
-                    LinearGradient(colors: [Theme.codex.opacity(0.5), Theme.claude.opacity(0.3)],
-                                   startPoint: .bottom, endPoint: .top))
-                .cornerRadius(2)
-            }
-            ForEach(Array(ma7.enumerated()), id: \.offset) { i, pt in
-                AreaMark(
-                    x: .value("日期", pt.date),
-                    y: .value("7日均", pt.value)
-                )
-                .foregroundStyle(
-                    LinearGradient(colors: [Theme.claude.opacity(0.20), Theme.claude.opacity(0.02)],
-                                   startPoint: .top, endPoint: .bottom))
-                .interpolationMethod(.catmullRom)
-                LineMark(
-                    x: .value("日期", pt.date),
-                    y: .value("7日均", pt.value)
-                )
-                .foregroundStyle(Theme.claude)
-                .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                .interpolationMethod(.catmullRom)
-            }
-        }
-        .chartXAxis {
-            AxisMarks { v in
-                if let s = v.as(String.self), labelDates.contains(s) {
-                    AxisValueLabel {
-                        Text(String(s.suffix(5)))
-                            .font(.system(size: 9))
-                            .foregroundStyle(Theme.tTertiary)
-                    }
+            .buttonStyle(.plain)
+            if hideProjects {
+                Text("已隐藏 \(projects.count) 个项目")
+                    .font(.system(size: 10)).foregroundStyle(Theme.tTertiary)
+            } else {
+                ForEach(projects) { p in
+                    StatBar(name: p.name, tokens: p.tokens, cost: p.cost,
+                            maxTokens: maxTok, tint: Theme.claude)
                 }
             }
         }
-        .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { v in
-                AxisValueLabel {
-                    if let n = v.as(Double.self) {
-                        Text("$\(Int(n))")
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(Theme.tTertiary)
-                    }
-                }
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [3]))
-                    .foregroundStyle(Color.primary.opacity(0.06))
-            }
-        }
-        .chartLegend(.hidden)
-        .frame(height: 110)
-    }
-
-    struct MAPoint: Identifiable {
-        var date: String; var value: Double; var id: String { date }
-    }
-
-    func movingAverage(_ data: [DailyCost], window: Int) -> [MAPoint] {
-        guard data.count >= window else {
-            return data.map { MAPoint(date: $0.date, value: $0.total) }
-        }
-        var result: [MAPoint] = []
-        for i in (window - 1)..<data.count {
-            let sum = data[(i - window + 1)...i].reduce(0.0) { $0 + $1.total }
-            result.append(MAPoint(date: data[i].date, value: sum / Double(window)))
-        }
-        return result
     }
 
     // MARK: - Heatmap
 
-    @State private var heatRange = 1  // 0=日(7天) 1=月 2=年
+    @State private var heatRange = 2  // 0=日(7天) 1=月 2=年
     @State private var selectedCell: String? = nil
 
     var heatmapSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("活跃热力")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 13, weight: .bold))
                 Spacer()
                 Picker("", selection: $heatRange) {
                     Text("周").tag(0); Text("月").tag(1); Text("年").tag(2)
@@ -287,7 +163,7 @@ struct DashboardView: View {
                         Circle().fill(Theme.claude).frame(width: 6, height: 6)
                         Text("Claude").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.claude)
                     }
-                    Text("输入 \(Fmt.human(d.c_in)) · 输出 \(Fmt.human(d.c_out))")
+                    Text("\(Fmt.human(d.c_in + d.c_out + d.c_cr + d.c_cw)) tok")
                         .font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.tTertiary)
                     Text(String(format: "$%.2f", d.claude))
                         .font(.system(size: 12, weight: .semibold, design: .monospaced)).foregroundStyle(Theme.tSecondary)
@@ -297,7 +173,7 @@ struct DashboardView: View {
                         Circle().fill(Theme.codex).frame(width: 6, height: 6)
                         Text("Codex").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.codex)
                     }
-                    Text("输入 \(Fmt.human(d.x_in)) · 输出 \(Fmt.human(d.x_out))")
+                    Text("\(Fmt.human(d.x_in + d.x_out + d.x_reason)) tok")
                         .font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.tTertiary)
                     Text(String(format: "$%.2f", d.codex))
                         .font(.system(size: 12, weight: .semibold, design: .monospaced)).foregroundStyle(Theme.tSecondary)
@@ -484,21 +360,27 @@ struct DashboardView: View {
     func loadData() {
         loading = true
         DispatchQueue.global(qos: .utility).async {
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            proc.arguments = ["python3", DataLoader.scriptPath, "--daily-costs"]
-            let pipe = Pipe()
-            proc.standardOutput = pipe
-            proc.standardError = Pipe()
-            try? proc.run()
-            let raw = pipe.fileHandleForReading.readDataToEndOfFile()
-            proc.waitUntilExit()
-            let result = try? JSONDecoder().decode(DashboardData.self, from: raw)
+            let dd = try? JSONDecoder().decode(DashboardData.self, from: Self.runScript("--daily-costs"))
+            let wd = try? JSONDecoder().decode(WrappedData.self, from: Self.runScript("--wrapped"))
             DispatchQueue.main.async {
-                daily = result?.daily ?? []
-                models = result?.models ?? []
+                daily = dd?.daily ?? []
+                models = dd?.models ?? []
+                wrapped = wd
                 loading = false
             }
         }
+    }
+
+    static func runScript(_ arg: String) -> Data {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        proc.arguments = ["python3", DataLoader.scriptPath, arg]
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = Pipe()
+        try? proc.run()
+        let raw = pipe.fileHandleForReading.readDataToEndOfFile()
+        proc.waitUntilExit()
+        return raw
     }
 }

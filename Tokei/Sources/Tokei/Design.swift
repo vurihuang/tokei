@@ -32,8 +32,8 @@ enum Theme {
     }
 
     static var bg: LinearGradient {
-        LinearGradient(colors: [Color(red: 0.22, green: 0.23, blue: 0.27).opacity(0.58),
-                                Color(red: 0.14, green: 0.15, blue: 0.18).opacity(0.65)],
+        LinearGradient(colors: [Color(red: 0.20, green: 0.21, blue: 0.25).opacity(0.92),
+                                Color(red: 0.12, green: 0.13, blue: 0.16).opacity(0.95)],
                        startPoint: .top, endPoint: .bottom)
     }
 
@@ -157,6 +157,35 @@ struct MiniBar: View {
         }
         .frame(height: 5)
         .animation(.easeOut(duration: 0.45), value: value)
+    }
+}
+
+// 排行条:细 Capsule + 中性轨道,对数刻度。模型/项目共用。
+struct StatBar: View {
+    var name: String
+    var tokens: Int
+    var cost: Double
+    var maxTokens: Double
+    var tint: Color
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                Text(name).font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.tPrimary).lineLimit(1)
+                Spacer(minLength: 8)
+                Text(Fmt.human(tokens)).font(.system(size: 9.5, design: .monospaced))
+                    .foregroundStyle(Theme.tTertiary)
+                Text("$\(Int(cost))").font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Theme.tSecondary)
+            }
+            GeometryReader { geo in
+                let ratio = maxTokens > 0 ? (Double(tokens) / maxTokens).squareRoot() : 0
+                Capsule().fill(LinearGradient(colors: [tint.opacity(0.5), tint],
+                                              startPoint: .leading, endPoint: .trailing))
+                    .frame(width: max(5, geo.size.width * CGFloat(ratio)), height: 5)
+            }
+            .frame(height: 5)
+        }
     }
 }
 

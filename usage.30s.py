@@ -225,7 +225,7 @@ def human(n: float) -> str:
 # ---------- 增量扫描缓存 ----------
 import tempfile as _tempfile
 _SCAN_CACHE_FILE = os.path.join(_tempfile.gettempdir(), "_tokei_scan_cache.json")
-_SCAN_CACHE_VERSION = 2
+_SCAN_CACHE_VERSION = 3
 
 
 def _load_scan_cache():
@@ -277,6 +277,8 @@ def scan_claude(bounds, cache):
         entry = fc.get(f)
         if not entry or entry.get("sig") != sig:
             days = {}
+            hours = [0] * 24
+            proj = None
             try:
                 with open(f, "r", encoding="utf-8", errors="ignore") as fh:
                     for line in fh:
@@ -285,7 +287,8 @@ def scan_claude(bounds, cache):
                         u = _claude_usage(line, want_dt=True)
                         if not u:
                             continue
-                        dk = u["dt"].date().isoformat()
+                        dt = u["dt"]
+                        dk = dt.date().isoformat()
                         day = days.setdefault(dk, {"in": 0, "out": 0, "cr": 0, "cw": 0,
                                                    "cost": 0.0, "models": {}})
                         day["in"] += u["in"]; day["out"] += u["out"]
@@ -294,9 +297,13 @@ def scan_claude(bounds, cache):
                             u["model"], {"in": 0, "out": 0, "cr": 0, "cw": 0, "cost": 0.0})
                         mm["in"] += u["in"]; mm["out"] += u["out"]
                         mm["cr"] += u["cr"]; mm["cw"] += u["cw"]; mm["cost"] += u["cost"]
+                        # Wrapped 用:小时分布 / 项目 / 会话跨度
+                        hours[dt.hour] += u["in"] + u["out"] + u["cr"] + u["cw"]
+                        if proj is None and u.get("cwd"):
+                            proj = u["cwd"]
             except OSError:
                 continue
-            fc[f] = {"sig": sig, "days": days}
+            fc[f] = {"sig": sig, "days": days, "hours": hours, "proj": proj}
 
     for p in stale:
         fc.pop(p, None)
@@ -371,7 +378,7 @@ def _claude_usage(line, want_dt=False):
         write_cost = (w5 or 0) / 1e6 * p["write5m"] + (w1 or 0) / 1e6 * p["write1h"]
     cost = inp / 1e6 * p["in"] + out / 1e6 * p["out"] + cr / 1e6 * p["cache_read"] + write_cost
     res = {"in": inp, "out": out, "cr": cr, "cw": cw, "cost": cost,
-           "model": msg.get("model")}
+           "model": msg.get("model"), "cwd": o.get("cwd")}
     if want_dt:
         res["dt"] = dt
     return res
@@ -1465,47 +1472,226 @@ def daily_costs():
     days = {}
     models = {}
 
+    _empty = lambda: {"claude": 0.0, "codex": 0.0,
+                       "c_in": 0, "c_out": 0, "c_cr": 0, "c_cw": 0,
+                       "x_in": 0, "x_out": 0, "x_cached": 0, "x_reason": 0,
+                       "tokens": 0, "sessions": 0}
+
     for fp, entry in cache.get("claude", {}).items():
         for dk, day in entry.get("days", {}).items():
-            d = days.setdefault(dk, {"claude": 0.0, "codex": 0.0,
-                                     "c_in": 0, "c_out": 0, "x_in": 0, "x_out": 0, "sessions": 0})
+            d = days.setdefault(dk, _empty())
             d["claude"] += day.get("cost", 0)
             d["c_in"] += day.get("in", 0); d["c_out"] += day.get("out", 0)
+            d["c_cr"] += day.get("cr", 0); d["c_cw"] += day.get("cw", 0)
+            d["tokens"] += day.get("in", 0) + day.get("out", 0) + day.get("cr", 0) + day.get("cw", 0)
             d["sessions"] += 1
             for mn, mv in day.get("models", {}).items():
                 nm = nice_model(mn)
-                m = models.setdefault(nm, {"cost": 0.0, "in": 0, "out": 0, "tool": "claude"})
+                m = models.setdefault(nm, {"cost": 0.0, "in": 0, "out": 0, "cr": 0, "cw": 0, "tool": "claude"})
                 m["cost"] += mv.get("cost", 0)
                 m["in"] += mv.get("in", 0); m["out"] += mv.get("out", 0)
+                m["cr"] += mv.get("cr", 0); m["cw"] += mv.get("cw", 0)
 
     for fp, entry in cache.get("codex", {}).items():
         for dk, day in entry.get("days", {}).items():
-            d = days.setdefault(dk, {"claude": 0.0, "codex": 0.0,
-                                     "c_in": 0, "c_out": 0, "x_in": 0, "x_out": 0, "sessions": 0})
+            d = days.setdefault(dk, _empty())
             d["codex"] += day.get("cost", 0)
             d["x_in"] += day.get("in", 0); d["x_out"] += day.get("out", 0)
+            d["x_cached"] += day.get("cached", 0); d["x_reason"] += day.get("reason", 0)
+            # Codex 的 in 已含 cached,总量 = in + out + reason(不重复加 cached)
+            d["tokens"] += day.get("in", 0) + day.get("out", 0) + day.get("reason", 0)
+
+    for fp, entry in cache.get("hermes", {}).items():
+        for dk, day in entry.get("days", {}).items():
+            d = days.setdefault(dk, _empty())
+            d["tokens"] += day.get("in", 0) + day.get("out", 0) + day.get("cr", 0) + day.get("cw", 0) + day.get("reason", 0)
+
+    for fp, entry in cache.get("qoder", {}).items():
+        for dk, day in entry.get("days", {}).items():
+            d = days.setdefault(dk, _empty())
+            d["tokens"] += day.get("in", 0) + day.get("out", 0)
 
     codex_total = sum(d["codex"] for d in days.values())
     codex_in = sum(d["x_in"] for d in days.values())
     codex_out = sum(d["x_out"] for d in days.values())
+    codex_reason = sum(d["x_reason"] for d in days.values())
     if codex_total > 0:
-        models["GPT-5.5 (Codex)"] = {"cost": round(codex_total, 2), "in": codex_in, "out": codex_out, "tool": "codex"}
+        models["GPT-5.5 (Codex)"] = {"cost": round(codex_total, 2), "in": codex_in, "out": codex_out,
+                                      "reason": codex_reason, "tool": "codex"}
 
     daily = [{"date": dk, "claude": round(v["claude"], 2), "codex": round(v["codex"], 2),
               "total": round(v["claude"] + v["codex"], 2),
-              "c_in": v["c_in"], "c_out": v["c_out"], "x_in": v["x_in"], "x_out": v["x_out"]}
+              "c_in": v["c_in"], "c_out": v["c_out"], "c_cr": v["c_cr"], "c_cw": v["c_cw"],
+              "x_in": v["x_in"], "x_out": v["x_out"], "x_cached": v["x_cached"], "x_reason": v["x_reason"],
+              "tokens": v["tokens"]}
              for dk, v in sorted(days.items())]
     model_list = []
     for n, v in sorted(models.items(), key=lambda kv: -kv[1]["cost"]):
         if v["cost"] <= 0:
             continue
+        if v.get("tool") == "codex":
+            total_tok = v["in"] + v["out"] + v.get("reason", 0)   # in 已含 cached
+        else:
+            total_tok = v["in"] + v["out"] + v.get("cr", 0) + v.get("cw", 0)
         out_k = v["out"] / 1000 if v["out"] else 0
         cost_per_k = round(v["cost"] / out_k, 3) if out_k > 0 else 0
-        out_ratio = round(v["out"] / (v["in"] + v["out"]) * 100, 1) if (v["in"] + v["out"]) > 0 else 0
-        model_list.append({"name": n, "cost": round(v["cost"], 2), "in": v["in"], "out": v["out"],
-                           "tool": v["tool"], "cost_per_k": cost_per_k, "out_ratio": out_ratio})
+        out_ratio = round(v["out"] / total_tok * 100, 1) if total_tok > 0 else 0
+        model_list.append({"name": n, "cost": round(v["cost"], 2),
+                           "in": v["in"], "out": v["out"], "cr": v.get("cr", 0), "cw": v.get("cw", 0),
+                           "tokens": total_tok, "tool": v["tool"],
+                           "cost_per_k": cost_per_k, "out_ratio": out_ratio})
 
     print(json.dumps({"daily": daily, "models": model_list}, ensure_ascii=False))
+
+
+def _streak_info(dates):
+    """dates: ISO 日期字符串列表。返回 (最长连续天数, 当前连续天数)。"""
+    if not dates:
+        return 0, 0
+    ds = sorted(date.fromisoformat(x) for x in dates)
+    max_run = run = 1
+    for i in range(1, len(ds)):
+        run = run + 1 if (ds[i] - ds[i - 1]).days == 1 else 1
+        if run > max_run:
+            max_run = run
+    cur = 0
+    if (date.today() - ds[-1]).days <= 1:   # 仅当最近活跃日是今/昨天才算"当前连续"
+        cur = 1
+        for i in range(len(ds) - 1, 0, -1):
+            if (ds[i] - ds[i - 1]).days == 1:
+                cur += 1
+            else:
+                break
+    return max_run, cur
+
+
+def wrapped():
+    """Tokei 回顾:作息 / 项目 / 连续 / 成就。纯读扫描缓存(Claude),不联网。"""
+    cache = _load_scan_cache()
+    if not cache.get("claude"):
+        compute()                       # 缓存空则先扫一遍(同 --json 路径)
+        cache = _load_scan_cache()
+    fc = cache.get("claude", {})
+
+    hours = [0] * 24
+    weekday = [0] * 7
+    day_tokens = {}
+    proj_tok = {}
+    day_projs = {}
+    model_tok = {}
+    total_tokens = 0
+    total_cost = 0.0
+
+    for f, entry in fc.items():
+        if not isinstance(entry, dict):
+            continue
+        h = entry.get("hours")
+        if h and len(h) == 24:
+            for i in range(24):
+                hours[i] += h[i]
+        proj_path = entry.get("proj") or ""
+        proj = os.path.basename(proj_path.rstrip("/")) or "?"
+        for dk, day in entry.get("days", {}).items():
+            tok = day["in"] + day["out"] + day["cr"] + day["cw"]
+            day_tokens[dk] = day_tokens.get(dk, 0) + tok
+            total_tokens += tok
+            total_cost += day.get("cost", 0)
+            pt = proj_tok.setdefault(proj, [0, 0.0])
+            pt[0] += tok; pt[1] += day.get("cost", 0)
+            day_projs.setdefault(dk, set()).add(proj)
+            weekday[date.fromisoformat(dk).weekday()] += tok
+            for mn, mv in day.get("models", {}).items():
+                nm = nice_model(mn)
+                model_tok[nm] = model_tok.get(nm, 0) + mv["in"] + mv["out"] + mv["cr"] + mv["cw"]
+
+    active = sorted(day_tokens.keys())
+    streak_max, streak_cur = _streak_info(active)
+    busiest_dk, busiest_tok = (max(day_tokens.items(), key=lambda kv: kv[1])
+                               if day_tokens else ("", 0))
+    top_model_name, top_model_tok = (max(model_tok.items(), key=lambda kv: kv[1])
+                                     if model_tok else ("-", 0))
+    projects = sorted(
+        ({"name": p, "tokens": v[0], "cost": round(v[1], 2)} for p, v in proj_tok.items()),
+        key=lambda x: -x["tokens"])[:8]
+    max_projs_day = max((len(s) for s in day_projs.values()), default=0)
+    night = sum(hours[0:6])
+    night_share = round(night / total_tokens * 100, 1) if total_tokens else 0.0
+
+    ach = []
+    def add(icon, title, desc, tint):
+        ach.append({"icon": icon, "title": title, "desc": desc, "tint": tint})
+
+    # Token 里程碑(金,取最高档)
+    if total_tokens >= 1_000_000_000_000:
+        add("crown.fill", "万亿俱乐部", f"{total_tokens/1e12:.2f} 万亿 token", "gold")
+    elif total_tokens >= 100_000_000_000:
+        add("hexagon.fill", "千亿俱乐部", f"{total_tokens/1e8:.0f} 亿 token", "gold")
+    elif total_tokens >= 10_000_000_000:
+        add("diamond.fill", "百亿俱乐部", f"{total_tokens/1e8:.0f} 亿 token", "gold")
+    elif total_tokens >= 1_000_000_000:
+        add("diamond", "十亿俱乐部", f"{total_tokens/1e8:.1f} 亿 token", "gold")
+
+    # 成本里程碑(绿,取最高档)
+    if total_cost >= 100000:
+        add("dollarsign.circle.fill", "十万刀", f"≈${int(total_cost):,}", "green")
+    elif total_cost >= 10000:
+        add("banknote.fill", "破万刀", f"≈${int(total_cost):,}", "green")
+    elif total_cost >= 1000:
+        add("banknote", "破千刀", f"≈${int(total_cost):,}", "green")
+
+    # 连续打卡(火橙,取最高档)
+    if streak_max >= 100:
+        add("flame.fill", "百日筑基", f"连续 {streak_max} 天", "coral")
+    elif streak_max >= 30:
+        add("flame.fill", "铁人", f"连续 {streak_max} 天", "coral")
+    elif streak_max >= 7:
+        add("flame.fill", "坚持", f"连续 {streak_max} 天", "coral")
+
+    # 单日爆发(火橙)
+    if busiest_tok >= 1_000_000_000:
+        add("bolt.fill", "爆肝日", f"单日 {busiest_tok/1e8:.0f} 亿 token", "coral")
+
+    # 项目维度(青蓝)
+    if max_projs_day >= 5:
+        add("square.grid.3x3.fill", "多线作战", f"单日 {max_projs_day} 个项目", "blue")
+    elif max_projs_day >= 3:
+        add("square.grid.2x2.fill", "多面手", f"单日 {max_projs_day} 个项目", "blue")
+    top_share = (max(v[0] for v in proj_tok.values()) / total_tokens * 100) if (proj_tok and total_tokens) else 0
+    if top_share >= 50:
+        add("scope", "专一", f"主项目占 {top_share:.0f}%", "blue")
+    if len(proj_tok) >= 10:
+        add("rectangle.3.group.fill", "广撒网", f"{len(proj_tok)} 个项目", "blue")
+
+    # 作息彩蛋(紫)
+    if night_share >= 5:
+        add("moon.stars.fill", "夜猫子", f"{night_share:.0f}% 在凌晨", "purple")
+    morning_share = (sum(hours[5:9]) / total_tokens * 100) if total_tokens else 0
+    if morning_share >= 12:
+        add("sunrise.fill", "早起鸟", f"{morning_share:.0f}% 在清晨", "purple")
+    weekend_share = ((weekday[5] + weekday[6]) / total_tokens * 100) if total_tokens else 0
+    if weekend_share >= 30:
+        add("beach.umbrella.fill", "周末战士", f"周末占 {weekend_share:.0f}%", "purple")
+
+    # 资历(玫红)
+    if len(active) >= 100:
+        add("calendar", "元老", f"{len(active)} 天活跃", "pink")
+
+    print(json.dumps({
+        "total_tokens": total_tokens,
+        "total_cost": round(total_cost, 2),
+        "active_days": len(active),
+        "streak_max": streak_max,
+        "streak_cur": streak_cur,
+        "busiest": {"date": busiest_dk, "tokens": busiest_tok},
+        "top_model": {"name": top_model_name, "tokens": top_model_tok},
+        "hours": hours,
+        "weekday": weekday,
+        "projects": projects,
+        "max_projs_day": max_projs_day,
+        "night_share": night_share,
+        "first_day": active[0] if active else "",
+        "achievements": ach,
+    }, ensure_ascii=False))
 
 
 if __name__ == "__main__":
@@ -1515,6 +1701,8 @@ if __name__ == "__main__":
         sys.exit(update_unknown())
     if "--daily-costs" in sys.argv:
         daily_costs()
+    elif "--wrapped" in sys.argv:
+        wrapped()
     elif "--json" in sys.argv:
         main_json()
     else:

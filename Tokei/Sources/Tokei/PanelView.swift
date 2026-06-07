@@ -8,7 +8,8 @@ struct PanelView: View {
     @State private var claudeModelsOpen = false
     @State private var geminiModelsOpen = false
     @State private var settingsOpen = false
-    @State private var showDashboard = false
+    @State private var mode: PanelMode = .cards
+    enum PanelMode { case cards, dashboard }
     @AppStorage("showClaude") private var showClaude = true
     @AppStorage("showCodex") private var showCodex = true
     @AppStorage("showGemini") private var showGemini = true
@@ -29,19 +30,19 @@ struct PanelView: View {
     }
 
     var body: some View {
-        let w = showDashboard ? max(panelWidth, 480) : panelWidth
+        let w = mode == .cards ? panelWidth : max(panelWidth, 480)
         if scrollable {
             ScrollView(.vertical, showsIndicators: false) { panelContent }
                 .frame(width: w)
                 .frame(maxHeight: maxPanelHeight)
-                .background(VisualEffect())
                 .background(Theme.bg)
+                .background(VisualEffect())
                 .environment(\.colorScheme, .dark)
         } else {
             panelContent
                 .frame(width: w, alignment: .top)
-                .background(VisualEffect())
                 .background(Theme.bg)
+                .background(VisualEffect())
                 .environment(\.colorScheme, .dark)
         }
     }
@@ -49,7 +50,7 @@ struct PanelView: View {
     private var panelContent: some View {
         VStack(alignment: .leading, spacing: 13) {
             header
-            if showDashboard {
+            if mode == .dashboard {
                 DashboardView()
             } else if let u = store.usage {
                 let cr = u.claude.ranges.get(sel), xr = u.codex.ranges.get(sel)
@@ -117,11 +118,11 @@ struct PanelView: View {
                 .font(.system(size: 9.5, design: .monospaced))
                 .foregroundStyle(Theme.tTertiary)
             Button {
-                withAnimation(.easeInOut(duration: 0.35)) { showDashboard.toggle() }
+                withAnimation(.easeInOut(duration: 0.35)) { mode = mode == .dashboard ? .cards : .dashboard }
             } label: {
-                Image(systemName: showDashboard ? "square.grid.2x2" : "chart.bar")
+                Image(systemName: "chart.bar")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(showDashboard ? Theme.claude : Theme.tTertiary)
+                    .foregroundStyle(mode == .dashboard ? Theme.claude : Theme.tTertiary)
                     .frame(width: 24, height: 24)
                     .background(Circle().fill(Color.primary.opacity(0.06)))
                     .contentShape(Circle())
@@ -575,13 +576,12 @@ struct PanelView: View {
     }
 
     var footer: some View {
-        VStack(spacing: 6) {
+        HStack(spacing: 4) {
             disclaimer
-            HStack(spacing: 4) {
-                Spacer()
-                IconButton(icon: "arrow.clockwise", label: "刷新") { store.refresh() }
-                IconButton(icon: "power", label: "退出") { NSApp.terminate(nil) }
-            }
+            Spacer()
+            KeepAwakeMenu(ka: store.keepAwake)
+            IconButton(icon: "arrow.clockwise", label: "刷新") { store.refresh() }
+            IconButton(icon: "power", label: "退出") { NSApp.terminate(nil) }
         }
     }
 
@@ -591,6 +591,8 @@ struct PanelView: View {
     @AppStorage("deviceName") private var deviceName = ""
     @AppStorage("autoSync") private var autoSync = false
     @AppStorage("syncInterval") private var syncInterval = 5
+    @AppStorage("sitReminderOn") private var sitReminderOn = false
+    @AppStorage("sitReminderInterval") private var sitReminderInterval = 90
 
     var settingsContent: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -651,6 +653,53 @@ struct PanelView: View {
                                 priceResult = ""
                             }
                         }
+                }
+            }
+
+            Rectangle().fill(Color.primary.opacity(0.06)).frame(height: 1)
+
+            // 久坐提醒
+            settingsSection("figure.walk.circle", "久坐提醒") {
+                HStack {
+                    Text("启用").font(.system(size: 11)).foregroundStyle(Theme.tPrimary)
+                    Spacer()
+                    Toggle("", isOn: $sitReminderOn)
+                        .toggleStyle(.switch).controlSize(.mini).labelsHidden()
+                        .onChange(of: sitReminderOn) { _ in store.sitReminder.updateRunning() }
+                }
+                .padding(.horizontal, 10).padding(.vertical, 7)
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.primary.opacity(0.04)))
+
+                if sitReminderOn {
+                    HStack {
+                        Text("间隔").font(.system(size: 10)).foregroundStyle(Theme.tTertiary)
+                        Spacer()
+                        Picker("", selection: $sitReminderInterval) {
+                            Text("45m").tag(45); Text("60m").tag(60); Text("90m").tag(90)
+                        }
+                        .pickerStyle(.segmented).frame(width: 130).controlSize(.mini)
+                        .onChange(of: sitReminderInterval) { _ in store.sitReminder.updateRunning() }
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+
+                    Button { store.sitReminder.testPing() } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "bell.badge").font(.system(size: 9))
+                            Text("发送测试提醒").font(.system(size: 10, weight: .medium))
+                        }
+                        .foregroundStyle(Theme.tSecondary)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.primary.opacity(0.08)))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 10)
+
+                    Text("基于系统空闲判断「是否离开电脑」,连续用机达设定时长提醒起身。注:看视频/开会不操作会被当作离开。")
+                        .font(.system(size: 8.5)).foregroundStyle(Theme.tTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 10).padding(.top, 2)
                 }
             }
 
