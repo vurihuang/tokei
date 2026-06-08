@@ -11,6 +11,22 @@ struct VisualEffect: NSViewRepresentable {
     func updateNSView(_ v: NSVisualEffectView, context: Context) {}
 }
 
+private class PassthroughView: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+struct Tip: NSViewRepresentable {
+    let text: String
+    func makeNSView(context: Context) -> NSView {
+        let v = PassthroughView(); v.toolTip = text; return v
+    }
+    func updateNSView(_ v: NSView, context: Context) { v.toolTip = text }
+}
+
+extension View {
+    func tip(_ text: String) -> some View { overlay(Tip(text: text)) }
+}
+
 // 设计系统:颜色 / 间距 / 圆角集中定义,组件语义化复用。
 enum Theme {
     static let claude = Color(red: 0.92, green: 0.52, blue: 0.40)   // 柔珊瑚
@@ -46,6 +62,7 @@ enum Theme {
 struct Card<Content: View>: View {
     var tint: Color
     @ViewBuilder var content: () -> Content
+    @State private var hover = false
     var body: some View {
         content()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -71,7 +88,11 @@ struct Card<Content: View>: View {
                                        startPoint: .topLeading, endPoint: .bottomTrailing),
                         lineWidth: 0.75)
             )
-            .shadow(color: Color.black.opacity(0.30), radius: 12, x: 0, y: 6)
+            .shadow(color: Color.black.opacity(hover ? 0.42 : 0.30),
+                    radius: hover ? 16 : 12, x: 0, y: hover ? 9 : 6)
+            .scaleEffect(hover ? 1.012 : 1)
+            .onHover { hover = $0 }
+            .animation(.easeOut(duration: 0.18), value: hover)
     }
 }
 

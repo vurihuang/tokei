@@ -59,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     var popover = NSPopover()
     var timer: Timer?
+    var globalMouseMonitor: Any?
 
     // 菜单栏家族品牌色(与面板 Theme.claude/codex 一致)。
     static let claudeColor = NSColor(red: 0.92, green: 0.52, blue: 0.40, alpha: 1)
@@ -75,7 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let host = NSHostingController(rootView: PanelView(store: store))
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
-        popover.behavior = .transient
+        popover.behavior = .applicationDefined
         popover.animates = true
 
         store.refresh()
@@ -84,13 +85,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.store.refresh()
         }
 
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            guard let self = self, self.popover.isShown else { return }
+            self.popover.close()
+        }
+
         if CommandLine.arguments.contains("--autoshow") {
-            popover.behavior = .applicationDefined
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
                 self?.togglePopover()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    self?.popover.behavior = .transient
-                }
             }
         }
     }

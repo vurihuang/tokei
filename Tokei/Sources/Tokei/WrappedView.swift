@@ -35,6 +35,8 @@ struct WrappedData: Codable {
 struct WrappedView: View {
     let data: WrappedData
     @State private var achievementsExpanded = false
+    @State private var funSeed = 0
+    @State private var showConfetti = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -44,6 +46,35 @@ struct WrappedView: View {
             Divider().opacity(0.15)
             rhythmSection(data)
         }
+        .overlay(alignment: .top) {
+            if showConfetti { ConfettiView().frame(height: 220).allowsHitTesting(false) }
+        }
+        .onAppear {
+            funSeed = Int.random(in: 0...2)
+            if Self.checkMilestone(data.total_tokens) {
+                showConfetti = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) { showConfetti = false }
+            }
+            let titles = data.achievements.map { $0.title }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { Self.markSeen(titles) }
+        }
+    }
+
+    // 成就"已见"集合 + token 里程碑档位(持久化,驱动金光/撒花)
+    static func seenSet() -> Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: "seenAchievements") ?? [])
+    }
+    static func markSeen(_ titles: [String]) {
+        UserDefaults.standard.set(Array(seenSet().union(titles)), forKey: "seenAchievements")
+    }
+    static func checkMilestone(_ tokens: Int) -> Bool {
+        let cur = tokens / 1_000_000_000          // 每 10 亿一档
+        let last = UserDefaults.standard.integer(forKey: "lastTokenMilestone")
+        if cur > last {
+            UserDefaults.standard.set(cur, forKey: "lastTokenMilestone")
+            return true
+        }
+        return false
     }
 
     // MARK: - Hero
@@ -67,6 +98,11 @@ struct WrappedView: View {
                                                     startPoint: .leading, endPoint: .trailing))
                     .contentTransition(.numericText())
                 Text("tokens").font(.system(size: 10.5)).foregroundStyle(Theme.tTertiary)
+            }
+            if d.total_cost > 0 {
+                Text("💡 " + funFactText(d))
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.white.opacity(0.7))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -143,32 +179,14 @@ struct WrappedView: View {
             }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 7), GridItem(.flexible(), spacing: 7)],
                       spacing: 7) {
-                ForEach(shown) { a in badge(a) }
+                let seen = Self.seenSet()
+                ForEach(Array(shown.enumerated()), id: \.element.id) { i, a in
+                    BadgeView(a: a, isNew: !seen.contains(a.title), delay: Double(i) * 0.07)
+                }
             }
         }
     }
 
-    func badge(_ a: WrappedAchievement) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: a.icon).font(.system(size: 12, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 26, height: 26)
-                .background(
-                    Circle().fill(LinearGradient(colors: [Theme.claude, Theme.claude.opacity(0.6)],
-                                                 startPoint: .topLeading, endPoint: .bottomTrailing))
-                )
-                .overlay(Circle().strokeBorder(Color.white.opacity(0.22), lineWidth: 0.5))
-                .shadow(color: Theme.claude.opacity(0.4), radius: 3, y: 1)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(a.title).font(.system(size: 11.5, weight: .bold)).foregroundStyle(Theme.tPrimary)
-                Text(a.desc).font(.system(size: 9)).foregroundStyle(Theme.tTertiary).lineLimit(1)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 9).padding(.vertical, 7)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(Color.primary.opacity(0.05)))
-    }
 
     // MARK: - 24h rhythm
     func rhythmSection(_ d: WrappedData) -> some View {
@@ -206,9 +224,101 @@ struct WrappedView: View {
     }
 
     // MARK: - helpers
+    // 成本换算彩蛋(随机:咖啡 / 火锅)
+    func funFactText(_ d: WrappedData) -> String {
+        let coffee = Int((d.total_cost / 4).rounded())
+        let hotpot = Int((d.total_cost / 40).rounded())
+        switch funSeed {
+        case 0:  return "这些花费 ≈ \(coffee.formatted()) 杯咖啡 ☕"
+        case 1:  return "这些花费 ≈ \(hotpot.formatted()) 顿火锅 🍲"
+        default: return "这些 token ≈ 码了 \(Fmt.human(Int(Double(d.total_tokens) * 0.6))) 字 ✍️"
+        }
+    }
+
     func intStr(_ v: Double) -> String {
         let f = NumberFormatter(); f.numberStyle = .decimal; f.maximumFractionDigits = 0
         return f.string(from: NSNumber(value: Int(v))) ?? "\(Int(v))"
     }
     func shortDate(_ s: String) -> String { s.count >= 10 ? String(s.suffix(5)) : s }
+}
+
+// 成就徽章:新解锁时金光扫过 + 轻弹入。
+struct BadgeView: View {
+    let a: WrappedAchievement
+    let isNew: Bool
+    let delay: Double
+    @State private var bounce: CGFloat = 1
+    @State private var shimmer: CGFloat = -1.3
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: a.icon).font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 26)
+                .background(
+                    Circle().fill(LinearGradient(colors: [Theme.claude, Theme.claude.opacity(0.6)],
+                                                 startPoint: .topLeading, endPoint: .bottomTrailing))
+                )
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.22), lineWidth: 0.5))
+                .shadow(color: Theme.claude.opacity(0.4), radius: 3, y: 1)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(a.title).font(.system(size: 11.5, weight: .bold)).foregroundStyle(Theme.tPrimary)
+                Text(a.desc).font(.system(size: 9)).foregroundStyle(Theme.tTertiary).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 9).padding(.vertical, 7)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Color.primary.opacity(0.05)))
+        .overlay {
+            GeometryReader { geo in
+                LinearGradient(colors: [.clear, .white.opacity(0.55), .clear],
+                               startPoint: .leading, endPoint: .trailing)
+                    .frame(width: geo.size.width * 0.45)
+                    .offset(x: shimmer * geo.size.width)
+                    .blendMode(.plusLighter)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .allowsHitTesting(false)
+        }
+        .scaleEffect(bounce)
+        .onAppear {
+            guard isNew else { return }
+            bounce = 0.7
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.5).delay(delay)) {
+                bounce = 1
+            }
+            withAnimation(.easeInOut(duration: 0.8).delay(delay + 0.1)) {
+                shimmer = 1.3
+            }
+        }
+    }
+}
+
+// 撒花:跨 token 里程碑时从顶部落下的彩屑。
+struct ConfettiView: View {
+    @State private var fall = false
+    private let palette: [Color] = [Theme.claude, Theme.qoder, Theme.hermes,
+                                    Theme.codex, Theme.gemini, Theme.openclaw]
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .top) {
+                ForEach(0..<30, id: \.self) { i in
+                    let frac = CGFloat((i * 37) % 100) / 100
+                    let dur = 1.5 + Double((i * 13) % 10) / 10
+                    let dly = Double((i * 7) % 8) / 10
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(palette[i % palette.count])
+                        .frame(width: 6, height: 9)
+                        .rotationEffect(.degrees(Double(i * 47)))
+                        .offset(x: frac * geo.size.width,
+                                y: fall ? geo.size.height + 40 : -40)
+                        .opacity(fall ? 0 : 1)
+                        .animation(.easeIn(duration: dur).delay(dly), value: fall)
+                }
+            }
+        }
+        .onAppear { fall = true }
+        .allowsHitTesting(false)
+    }
 }

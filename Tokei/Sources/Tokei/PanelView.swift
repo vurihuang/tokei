@@ -9,7 +9,8 @@ struct PanelView: View {
     @State private var geminiModelsOpen = false
     @State private var settingsOpen = false
     @State private var mode: PanelMode = .cards
-    enum PanelMode { case cards, dashboard }
+    @State private var trailProjects: [TrailProject]?
+    enum PanelMode { case cards, dashboard, projects }
     @AppStorage("showClaude") private var showClaude = true
     @AppStorage("showCodex") private var showCodex = true
     @AppStorage("showGemini") private var showGemini = true
@@ -30,7 +31,7 @@ struct PanelView: View {
     }
 
     var body: some View {
-        let w = mode == .cards ? panelWidth : max(panelWidth, 480)
+        let w = mode == .cards ? panelWidth : max(panelWidth, 420)
         if scrollable {
             ScrollView(.vertical, showsIndicators: false) { panelContent }
                 .frame(width: w)
@@ -52,6 +53,8 @@ struct PanelView: View {
             header
             if mode == .dashboard {
                 DashboardView()
+            } else if mode == .projects {
+                ProjectTrailView(cached: $trailProjects)
             } else if let u = store.usage {
                 let cr = u.claude.ranges.get(sel), xr = u.codex.ranges.get(sel)
                 let gr = u.gemini.ranges.get(sel), kr = u.grok.ranges.get(sel)
@@ -100,23 +103,62 @@ struct PanelView: View {
     }
 
     // MARK: - 品牌头部
+    // 节日皮肤:特定日期 logo 旁挂个小角标。
+    static func festiveEmoji() -> String? {
+        let c = Calendar.current.dateComponents([.month, .day], from: Date())
+        switch (c.month ?? 0, c.day ?? 0) {
+        case (12, 24), (12, 25): return "🎄"
+        case (1, 1):             return "🎉"
+        case (10, 31):           return "🎃"
+        case (2, 14):            return "❤️"
+        case (2, 16), (2, 17), (2, 18): return "🧧"   // 2026 春节
+        default:                 return nil
+        }
+    }
+
     var header: some View {
         HStack(spacing: 9) {
-            Image(systemName: "timer")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(Theme.brand)
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Tokei")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .tracking(0.5)
-                Text("时计 · AI 用量")
-                    .font(.system(size: 9))
-                    .foregroundStyle(Theme.tTertiary)
+            Button {
+                if mode != .cards { withAnimation(.easeInOut(duration: 0.35)) { mode = .cards } }
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: "timer")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Theme.brand)
+                        .overlay(alignment: .topTrailing) {
+                            if let e = Self.festiveEmoji() {
+                                Text(e).font(.system(size: 11)).offset(x: 7, y: -7)
+                            }
+                        }
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("Tokei")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .tracking(0.5)
+                        Text("时计 · AI 用量")
+                            .font(.system(size: 9))
+                            .foregroundStyle(Theme.tTertiary)
+                    }
+                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .tip("主页")
             Spacer()
             Text(store.lastUpdated)
                 .font(.system(size: 9.5, design: .monospaced))
                 .foregroundStyle(Theme.tTertiary)
+            Button {
+                withAnimation(.easeInOut(duration: 0.35)) { mode = mode == .projects ? .cards : .projects }
+            } label: {
+                Image(systemName: "folder")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(mode == .projects ? Theme.claude : Theme.tTertiary)
+                    .frame(width: 24, height: 24)
+                    .background(Circle().fill(Color.primary.opacity(0.06)))
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .tip("项目足迹")
             Button {
                 withAnimation(.easeInOut(duration: 0.35)) { mode = mode == .dashboard ? .cards : .dashboard }
             } label: {
@@ -128,6 +170,7 @@ struct PanelView: View {
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
+            .tip("数据面板")
             Button { settingsOpen.toggle() } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 11, weight: .medium))
@@ -137,6 +180,7 @@ struct PanelView: View {
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
+            .tip("设置")
             .popover(isPresented: $settingsOpen, arrowEdge: .bottom) { settingsContent }
         }
     }
@@ -573,6 +617,7 @@ struct PanelView: View {
             }
             MiniBar(value: pct, tint: pct <= 15 ? .red : tint)
         }
+        .help(reset != nil ? "\(Fmt.countdown(reset)) 后重置" : "")
     }
 
     var footer: some View {

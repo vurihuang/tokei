@@ -339,6 +339,14 @@ enum Fmt {
         return f.string(from: d)
     }
 
+    static func countdown(_ epoch: Int?) -> String {
+        guard let e = epoch else { return "?" }
+        let s = TimeInterval(e) - Date().timeIntervalSince1970
+        if s <= 0 { return "即将重置" }
+        let h = Int(s) / 3600, m = (Int(s) % 3600) / 60
+        return h > 0 ? "\(h)h\(m)m" : "\(m)m"
+    }
+
     static func duration(_ ms: Int) -> String {
         let s = ms / 1000
         if s >= 3600 { return String(format: "%dh%dm", s / 3600, (s % 3600) / 60) }
@@ -347,4 +355,16 @@ enum Fmt {
     }
 
     static func price(_ x: Double) -> String { String(format: "%g", x) }
+
+    static func relativeDate(_ iso: String) -> String {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        guard let d = f.date(from: iso) else { return iso }
+        let days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: d),
+                                                    to: Calendar.current.startOfDay(for: Date())).day ?? 0
+        if days == 0 { return "今天" }
+        if days == 1 { return "昨天" }
+        if days <= 7 { return "\(days)天前" }
+        if days <= 30 { return "\(days / 7)周前" }
+        return "\(days / 30)月前"
+    }
 }

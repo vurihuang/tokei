@@ -1694,6 +1694,141 @@ def wrapped():
     }, ensure_ascii=False))
 
 
+def projects():
+    """项目足迹:从缓存聚合所有项目路径、活跃时间、session 数、token、成本。"""
+    cache = _load_scan_cache()
+    if not cache.get("claude"):
+        compute()
+        cache = _load_scan_cache()
+
+    proj_map = {}  # path → {sessions, tokens, cost, last_active, model_tok}
+
+    # Claude sessions
+    for f, entry in cache.get("claude", {}).items():
+        if not isinstance(entry, dict):
+            continue
+        proj_path = entry.get("proj") or ""
+        if not proj_path or proj_path == "?":
+            continue
+        p = proj_map.setdefault(proj_path, {"sessions": 0, "tokens": 0, "cost": 0.0,
+                                             "last_active": "", "model_tok": {}, "tools": set()})
+        p["sessions"] += 1
+        p["tools"].add("claude")
+        for dk, day in entry.get("days", {}).items():
+            tok = day["in"] + day["out"] + day["cr"] + day["cw"]
+            p["tokens"] += tok
+            p["cost"] += day.get("cost", 0)
+            if dk > p["last_active"]:
+                p["last_active"] = dk
+            for mn, mv in day.get("models", {}).items():
+                nm = nice_model(mn)
+                p["model_tok"][nm] = p["model_tok"].get(nm, 0) + mv["in"] + mv["out"] + mv["cr"] + mv["cw"]
+
+    # Grok sessions (cwd encoded in directory name)
+    from urllib.parse import unquote
+    for sm in glob.glob(os.path.join(GROK_DIR, "*", "*", "summary.json")):
+        parts = sm.split(os.sep)
+        try:
+            cwd_encoded = parts[-3]
+            grok_path = unquote(cwd_encoded)
+            if not grok_path.startswith("/"):
+                continue
+            with open(sm, "r", encoding="utf-8", errors="ignore") as fh:
+                s = json.load(fh)
+            dt = parse_ts(s.get("updated_at") or s.get("created_at") or "")
+            if dt is None:
+                continue
+            dk = dt.astimezone().date().isoformat()
+            p = proj_map.setdefault(grok_path, {"sessions": 0, "tokens": 0, "cost": 0.0,
+                                                 "last_active": "", "model_tok": {}, "tools": set()})
+            p["sessions"] += 1
+            p["tools"].add("grok")
+            if dk > p["last_active"]:
+                p["last_active"] = dk
+        except Exception:
+            continue
+
+    # 检测本地 LISTEN 端口,匹配项目 cwd
+    port_map = _detect_local_servers(set(proj_map.keys()))
+
+    result = []
+    for path, info in proj_map.items():
+        name = os.path.basename(path.rstrip("/")) or path
+        top_model = max(info["model_tok"].items(), key=lambda kv: kv[1])[0] if info["model_tok"] else ""
+        entry = {
+            "path": path,
+            "name": name,
+            "last_active": info["last_active"],
+            "sessions": info["sessions"],
+            "tokens": info["tokens"],
+            "cost": round(info["cost"], 2),
+            "top_model": top_model,
+            "tools": sorted(info["tools"]),
+        }
+        if path in port_map:
+            entry["ports"] = sorted(port_map[path])
+        result.append(entry)
+    result.sort(key=lambda x: x["last_active"], reverse=True)
+    print(json.dumps(result, ensure_ascii=False))
+
+
+def _detect_local_servers(project_paths):
+    """检测哪些项目目录下有进程正在监听 TCP 端口。返回 {path: [port, ...]}。"""
+    import subprocess
+    try:
+        # 1) pid → ports (LISTEN)
+        out1 = subprocess.check_output(
+            ["lsof", "-iTCP", "-sTCP:LISTEN", "-P", "-n", "-F", "pn"],
+            stderr=subprocess.DEVNULL, timeout=10, text=True)
+        pid_ports = {}
+        cur_pid = None
+        for line in out1.strip().split("\n"):
+            if line.startswith("p"):
+                cur_pid = line[1:]
+            elif line.startswith("n") and cur_pid:
+                addr = line[1:]
+                port = addr.rsplit(":", 1)[-1] if ":" in addr else None
+                if port and port.isdigit():
+                    p = int(port)
+                    if 1024 <= p <= 65535:
+                        pid_ports.setdefault(cur_pid, set()).add(p)
+
+        if not pid_ports:
+            return {}
+
+        # 2) pid → cwd (只查有监听端口的 pid，避免全系统扫描超时)
+        pid_arg = ",".join(pid_ports.keys())
+        out2 = subprocess.check_output(
+            ["lsof", "-a", "-d", "cwd", "-p", pid_arg, "-F", "pn"],
+            stderr=subprocess.DEVNULL, timeout=10, text=True)
+        pid_cwd = {}
+        cur_pid = None
+        for line in out2.strip().split("\n"):
+            if line.startswith("p"):
+                cur_pid = line[1:]
+            elif line.startswith("n") and cur_pid:
+                pid_cwd[cur_pid] = line[1:]
+
+        # 3) 交叉匹配: 进程 cwd 是项目路径或其子目录
+        #    匹配最深(最长)的项目路径，避免 home 目录吃掉所有端口
+        home = os.path.expanduser("~")
+        sorted_projs = sorted(project_paths, key=len, reverse=True)
+        result = {}
+        for pid, ports in pid_ports.items():
+            cwd = pid_cwd.get(pid, "")
+            if not cwd or cwd == home:
+                continue
+            for proj in sorted_projs:
+                if proj == home:
+                    continue
+                if cwd == proj or cwd.startswith(proj + "/"):
+                    result.setdefault(proj, set()).update(ports)
+                    break
+        return result
+    except Exception:
+        return {}
+
+
 if __name__ == "__main__":
     if "--update-prices" in sys.argv:
         sys.exit(update_prices())
@@ -1701,6 +1836,8 @@ if __name__ == "__main__":
         sys.exit(update_unknown())
     if "--daily-costs" in sys.argv:
         daily_costs()
+    elif "--projects" in sys.argv:
+        projects()
     elif "--wrapped" in sys.argv:
         wrapped()
     elif "--json" in sys.argv:
