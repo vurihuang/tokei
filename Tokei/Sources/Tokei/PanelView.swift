@@ -944,7 +944,7 @@ struct PanelView: View {
 
                 deviceStatusBlock
 
-                if store.syncEnabled && !syncDir.isEmpty {
+                if store.syncEnabled {
                     let dataRepo = cachedRemoteUrl
                     let hasRemote = !dataRepo.isEmpty && !dataRepo.contains("未配置")
                     Rectangle().fill(Color.primary.opacity(0.06)).frame(height: 1)
@@ -958,7 +958,12 @@ struct PanelView: View {
                                 .foregroundStyle(Theme.tSecondary)
                         }
 
-                        if hasRemote {
+                        if syncDir.isEmpty {
+                            Text("请先点击「选择」设置同步目录(需为 Git 仓库)")
+                                .font(.system(size: 9)).foregroundStyle(Theme.tTertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            copyBlock("读取 \(Self.skillPath) 并帮我创建 Tokei 私有数据仓库,配置多设备同步")
+                        } else if hasRemote {
                             Text("另一台 Mac").font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.tSecondary)
                             Text("安装 Tokei.app 后选择同一个数据仓库")
                                 .font(.system(size: 8.5)).foregroundStyle(Theme.tTertiary)

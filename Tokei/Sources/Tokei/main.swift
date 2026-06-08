@@ -92,8 +92,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.store.refresh()
         }
 
-        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self = self, self.popover.isShown else { return }
+            if let popoverWindow = self.popover.contentViewController?.view.window,
+               popoverWindow == event.window { return }
             self.popover.close()
         }
 
