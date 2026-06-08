@@ -39,7 +39,7 @@ struct PanelView: View {
     }
 
     var body: some View {
-        let w = mode == .cards ? panelWidth : max(panelWidth, 420)
+        let w = mode == .settings ? max(panelWidth, 560) : (mode == .cards ? panelWidth : max(panelWidth, 420))
         if scrollable {
             ScrollView(.vertical, showsIndicators: false) { panelContent }
                 .frame(width: w)
@@ -683,377 +683,24 @@ struct PanelView: View {
     @AppStorage("sitReminderInterval") private var sitReminderInterval = 90
 
     var settingsContent: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            // 显示卡片
-            settingsSection("square.grid.2x2", "显示卡片") {
-                settingsRow("Claude Code", tint: Theme.claude, isOn: $showClaude)
-                settingsRow("Codex", tint: Theme.codex, isOn: $showCodex)
-                settingsRow("Gemini CLI", tint: Theme.gemini, isOn: $showGemini)
-                settingsRow("Grok CLI", tint: Theme.grok, isOn: $showGrok)
-                settingsRow("Qoder", tint: Theme.qoder, isOn: $showQoder)
-                settingsRow("Hermes", tint: Theme.hermes, isOn: $showHermes)
-                settingsRow("OpenClaw", tint: Theme.openclaw, isOn: $showOpenClaw)
-                settingsRow("OpenCode", tint: Theme.opencode, isOn: $showOpenCode)
+        VStack(alignment: .leading, spacing: 12) {
+            settingsHeader
+
+            HStack(alignment: .top, spacing: 11) {
+                VStack(alignment: .leading, spacing: 11) {
+                    settingsAgentsSection
+                    settingsDiagnosticsSection
+                    settingsPricingSection
+                }
+                .frame(maxWidth: .infinity, alignment: .top)
+
+                VStack(alignment: .leading, spacing: 11) {
+                    settingsReminderSection
+                    settingsSyncSection
+                    if !store.syncEnabled { settingsRemoteHintSection }
+                }
+                .frame(maxWidth: .infinity, alignment: .top)
             }
-
-            Rectangle().fill(Color.primary.opacity(0.06)).frame(height: 1)
-
-            // 价格表
-            settingsSection("dollarsign.circle", "价格表") {
-                HStack(spacing: 8) {
-                    Button { runPriceUpdate("--update-prices", "全量更新中…") } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.down.circle").font(.system(size: 9))
-                            Text("全量更新").font(.system(size: 10, weight: .medium))
-                        }
-                        .foregroundStyle(Theme.tPrimary)
-                        .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.primary.opacity(0.08)))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(priceUpdating)
-
-                    Button { runPriceUpdate("--update-unknown", "查漏补缺中…") } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "magnifyingglass.circle").font(.system(size: 9))
-                            Text("查漏补缺").font(.system(size: 10, weight: .medium))
-                        }
-                        .foregroundStyle(Theme.tPrimary)
-                        .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.primary.opacity(0.08)))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(priceUpdating)
-
-                    if priceUpdating { ProgressView().controlSize(.mini) }
-                }
-                .padding(.horizontal, 10).padding(.vertical, 5)
-
-                if !priceResult.isEmpty && !priceUpdating {
-                    Text(priceResult)
-                        .font(.system(size: 9)).foregroundStyle(Theme.tTertiary)
-                        .padding(.horizontal, 10)
-                        .onTapGesture { priceResult = "" }
-                        .onAppear {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
-                                priceResult = ""
-                            }
-                        }
-                }
-            }
-
-            Rectangle().fill(Color.primary.opacity(0.06)).frame(height: 1)
-
-            settingsSection("stethoscope", "诊断") {
-                HStack(spacing: 8) {
-                    Button { toggleDiagnostics() } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: debugOutput.isEmpty || debugRunning ? "ladybug" : "chevron.up.circle")
-                                .font(.system(size: 9))
-                            Text(debugButtonTitle)
-                                .font(.system(size: 10, weight: .medium))
-                        }
-                        .foregroundStyle(Theme.tPrimary)
-                        .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.primary.opacity(0.08)))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(debugRunning)
-
-                    if debugRunning { ProgressView().controlSize(.mini) }
-
-                    Spacer()
-
-                    if !debugOutput.isEmpty {
-                        Button {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(debugOutput, forType: .string)
-                        } label: {
-                            Image(systemName: "doc.on.doc")
-                                .font(.system(size: 10))
-                                .foregroundStyle(Theme.tTertiary)
-                        }
-                        .buttonStyle(.plain)
-                        .tip("复制诊断")
-                    }
-                }
-                .padding(.horizontal, 10).padding(.vertical, 5)
-
-                if !debugOutput.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.18)) { debugExpanded.toggle() }
-                        } label: {
-                            HStack(spacing: 5) {
-                                Image(systemName: debugExpanded ? "chevron.down" : "chevron.right")
-                                    .font(.system(size: 8, weight: .semibold))
-                                Text(debugSummary)
-                                    .font(.system(size: 9, design: .monospaced))
-                                    .lineLimit(1)
-                                Spacer()
-                            }
-                            .foregroundStyle(Theme.tSecondary)
-                        }
-                        .buttonStyle(.plain)
-
-                        if debugExpanded {
-                            Text(debugOutput)
-                                .font(.system(size: 8.5, design: .monospaced))
-                                .foregroundStyle(Theme.tSecondary)
-                                .lineLimit(16)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .padding(8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color.primary.opacity(0.05)))
-                    .padding(.horizontal, 10)
-                }
-            }
-
-            Rectangle().fill(Color.primary.opacity(0.06)).frame(height: 1)
-
-            // 久坐提醒
-            settingsSection("figure.walk.circle", "久坐提醒") {
-                HStack {
-                    Text("启用").font(.system(size: 11)).foregroundStyle(Theme.tPrimary)
-                    Spacer()
-                    Toggle("", isOn: $sitReminderOn)
-                        .toggleStyle(.switch).controlSize(.mini).labelsHidden()
-                        .onChange(of: sitReminderOn) { _ in store.sitReminder.updateRunning() }
-                }
-                .padding(.horizontal, 10).padding(.vertical, 7)
-                .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.primary.opacity(0.04)))
-
-                if sitReminderOn {
-                    HStack {
-                        Text("间隔").font(.system(size: 10)).foregroundStyle(Theme.tTertiary)
-                        Spacer()
-                        Picker("", selection: $sitReminderInterval) {
-                            Text("45m").tag(45); Text("60m").tag(60); Text("90m").tag(90)
-                        }
-                        .pickerStyle(.segmented).frame(width: 130).controlSize(.mini)
-                        .onChange(of: sitReminderInterval) { _ in store.sitReminder.updateRunning() }
-                    }
-                    .padding(.horizontal, 10).padding(.vertical, 5)
-
-                    Button { store.sitReminder.testPing() } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "bell.badge").font(.system(size: 9))
-                            Text("发送测试提醒").font(.system(size: 10, weight: .medium))
-                        }
-                        .foregroundStyle(Theme.tSecondary)
-                        .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.primary.opacity(0.08)))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 10)
-
-                    Text("基于系统空闲判断「是否离开电脑」,连续用机达设定时长提醒起身。注:看视频/开会不操作会被当作离开。")
-                        .font(.system(size: 8.5)).foregroundStyle(Theme.tTertiary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 10).padding(.top, 2)
-                }
-            }
-
-            Rectangle().fill(Color.primary.opacity(0.06)).frame(height: 1)
-
-            // 多设备同步
-            settingsSection("arrow.triangle.2.circlepath", "多设备同步") {
-                HStack {
-                    Text("启用").font(.system(size: 11)).foregroundStyle(Theme.tPrimary)
-                    Spacer()
-                    Toggle("", isOn: $store.syncEnabled)
-                        .toggleStyle(.switch).controlSize(.mini).labelsHidden()
-                        .onChange(of: store.syncEnabled) { on in
-                            if on { setupSync() } else { store.stopAutoSync() }
-                        }
-                }
-                .padding(.horizontal, 10).padding(.vertical, 7)
-                .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.primary.opacity(0.04)))
-
-                if store.syncEnabled {
-                    // 设备名
-                    HStack {
-                        Text("设备名").font(.system(size: 10)).foregroundStyle(Theme.tTertiary)
-                        Spacer()
-                        TextField("hostname", text: $deviceName)
-                            .font(.system(size: 10, design: .monospaced))
-                            .textFieldStyle(.plain)
-                            .frame(width: 100)
-                            .multilineTextAlignment(.trailing)
-                            .onChange(of: deviceName) { _ in saveSync() }
-                    }
-                    .padding(.horizontal, 10).padding(.vertical, 5)
-
-                    // 同步目录
-                    HStack {
-                        Text("目录").font(.system(size: 10)).foregroundStyle(Theme.tTertiary)
-                        Spacer()
-                        Text(syncDir.isEmpty ? "未设置" : (syncDir as NSString).lastPathComponent)
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(syncDir.isEmpty ? Theme.tTertiary : Theme.tSecondary)
-                            .lineLimit(1)
-                        Button("选择") { pickSyncDir() }
-                            .font(.system(size: 10))
-                            .buttonStyle(.plain)
-                            .foregroundStyle(Theme.claude)
-                    }
-                    .padding(.horizontal, 10).padding(.vertical, 5)
-
-                    // 立即同步 + 自动同步
-                    HStack(spacing: 8) {
-                        Button {
-                            store.doSync()
-                        } label: {
-                            HStack(spacing: 4) {
-                                if store.syncing {
-                                    ProgressView().controlSize(.mini)
-                                } else {
-                                    Image(systemName: "arrow.triangle.2.circlepath")
-                                        .font(.system(size: 9))
-                                }
-                                Text("同步").font(.system(size: 10, weight: .medium))
-                            }
-                            .foregroundStyle(Theme.tPrimary)
-                            .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(Color.primary.opacity(0.08)))
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(store.syncing || syncDir.isEmpty)
-
-                        Spacer()
-                        Text("自动").font(.system(size: 10)).foregroundStyle(Theme.tTertiary)
-                        Toggle("", isOn: $autoSync)
-                            .toggleStyle(.switch).controlSize(.mini).labelsHidden()
-                            .onChange(of: autoSync) { on in
-                                if on { store.startAutoSync(minutes: syncInterval) }
-                                else { store.stopAutoSync() }
-                            }
-                        if autoSync {
-                            Picker("", selection: $syncInterval) {
-                                Text("1m").tag(1); Text("5m").tag(5); Text("15m").tag(15)
-                            }
-                            .pickerStyle(.segmented)
-                            .frame(width: 90)
-                            .controlSize(.mini)
-                            .onChange(of: syncInterval) { v in
-                                store.startAutoSync(minutes: v)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 10).padding(.vertical, 5)
-
-                    // 展示范围
-                    HStack {
-                        Text("展示").font(.system(size: 10)).foregroundStyle(Theme.tTertiary)
-                        Spacer()
-                        Picker("", selection: $store.showAllDevices) {
-                            Text("本机").tag(false); Text("全部设备").tag(true)
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(width: 120)
-                        .controlSize(.mini)
-                    }
-                    .padding(.horizontal, 10).padding(.vertical, 5)
-
-                    // 设备状态
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 5) {
-                            Image(systemName: "desktopcomputer")
-                                .font(.system(size: 8)).foregroundStyle(.green)
-                            Text(deviceName.isEmpty ? "本机" : deviceName)
-                                .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.tPrimary)
-                            Text("(本机)").font(.system(size: 9)).foregroundStyle(Theme.tTertiary)
-                        }
-                        if store.peers.isEmpty {
-                            HStack(spacing: 5) {
-                                Image(systemName: "clock")
-                                    .font(.system(size: 8)).foregroundStyle(Theme.tTertiary)
-                                Text("等待其他设备…")
-                                    .font(.system(size: 10)).foregroundStyle(Theme.tTertiary)
-                            }
-                        } else {
-                            ForEach(store.peers) { p in
-                                HStack(spacing: 5) {
-                                    Image(systemName: "laptopcomputer")
-                                        .font(.system(size: 8)).foregroundStyle(Theme.codex)
-                                    Text(p.deviceId)
-                                        .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.tPrimary)
-                                    Spacer()
-                                    Text(Fmt.reset(Int(p.lastSync.timeIntervalSince1970)))
-                                        .font(.system(size: 9, design: .monospaced)).foregroundStyle(Theme.tTertiary)
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 10).padding(.vertical, 5)
-
-                    // 添加设备
-                    if store.syncEnabled && !syncDir.isEmpty {
-                        let dataRepo = Self.gitRemoteUrl(syncDir)
-                        let hasRemote = !dataRepo.contains("未配置")
-                        let projectDir = (DataLoader.scriptPath as NSString).deletingLastPathComponent
-                        Rectangle().fill(Color.primary.opacity(0.06)).frame(height: 1)
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 5) {
-                                Image(systemName: "plus.circle").font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(Theme.hermes)
-                                Text("添加设备")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(Theme.tSecondary)
-                            }
-
-                            if hasRemote {
-                                // Mac: 装 app + 选同一个数据仓库
-                                Text("另一台 Mac:").font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.tSecondary)
-                                Text("安装 Tokei.app → 设置 → 多设备同步 → 目录选择同一个数据仓库")
-                                    .font(.system(size: 8.5)).foregroundStyle(Theme.tTertiary)
-                                    .fixedSize(horizontal: false, vertical: true)
-
-                                Rectangle().fill(Color.primary.opacity(0.04)).frame(height: 1)
-
-                                // 远程服务器: 一条命令
-                                Text("远程 Linux:").font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.tSecondary)
-                                copyBlock("git clone \(dataRepo) ~/.tokei/sync && cp ~/.tokei/sync/usage.30s.py ~/.tokei/ 2>/dev/null; echo '{\"sync_dir\":\"~/.tokei/sync\",\"device_id\":\"'$(hostname -s)'\"}' > ~/.tokei/config.json && (crontab -l 2>/dev/null; echo '*/5 * * * * cd ~/.tokei/sync && python3 ~/.tokei/usage.30s.py --json >/dev/null && git pull -q && git add -A && git diff --cached --quiet || git commit -qm sync && git push -q') | crontab -")
-                            } else {
-                                Text("数据目录未关联 Git 仓库")
-                                    .font(.system(size: 9)).foregroundStyle(Theme.tTertiary)
-                                Text("对 Agent 说:").font(.system(size: 9)).foregroundStyle(Theme.tTertiary)
-                                copyBlock("读取 \(Self.skillPath) 并帮我创建 Tokei 私有数据仓库,配置多设备同步")
-                            }
-                        }
-                        .padding(.horizontal, 10).padding(.vertical, 5)
-                    }
-                }
-            }
-
-            // 多设备/远程提示
-            if !store.syncEnabled {
-                Rectangle().fill(Color.primary.opacity(0.06)).frame(height: 1)
-                settingsSection("antenna.radiowaves.left.and.right", "多设备 / 远程采集") {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("多台 Mac 或远程服务器的数据通过私有 Git 仓库同步,每台设备独立采集、自动加和")
-                            .font(.system(size: 9)).foregroundStyle(Theme.tTertiary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text("对 Agent 说:").font(.system(size: 9)).foregroundStyle(Theme.tTertiary)
-                        copyBlock("读取 \(Self.skillPath) 帮我配置 Tokei 多设备同步")
-                        Text("或手动:开启上方「多设备同步」→ 选择数据仓库目录")
-                            .font(.system(size: 8.5)).foregroundStyle(Theme.tTertiary)
-                    }
-                    .padding(.horizontal, 10).padding(.vertical, 5)
-                }
-            }
-
-            Rectangle().fill(Color.primary.opacity(0.06)).frame(height: 1)
 
             HStack {
                 Spacer()
@@ -1065,23 +712,390 @@ struct PanelView: View {
             .padding(.top, 2)
         }
         .padding(14)
-        .frame(width: mode == .settings ? min(panelWidth, 420) : 260)
+        .frame(width: mode == .settings ? max(panelWidth, 560) : 260)
         .background(Theme.bg)
         .environment(\.colorScheme, .dark)
+    }
+
+    var settingsAgentsSection: some View {
+        settingsSection("square.grid.2x2", "显示卡片") {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 7),
+                                GridItem(.flexible(), spacing: 7)], spacing: 7) {
+                settingsRow("Claude", tint: Theme.claude, isOn: $showClaude)
+                settingsRow("Codex", tint: Theme.codex, isOn: $showCodex)
+                settingsRow("Gemini", tint: Theme.gemini, isOn: $showGemini)
+                settingsRow("Grok", tint: Theme.grok, isOn: $showGrok)
+                settingsRow("Qoder", tint: Theme.qoder, isOn: $showQoder)
+                settingsRow("Hermes", tint: Theme.hermes, isOn: $showHermes)
+                settingsRow("OpenClaw", tint: Theme.openclaw, isOn: $showOpenClaw)
+                settingsRow("OpenCode", tint: Theme.opencode, isOn: $showOpenCode)
+            }
+        }
+    }
+
+    var settingsPricingSection: some View {
+        settingsSection("dollarsign.circle", "价格表") {
+            HStack(spacing: 8) {
+                settingsActionButton(icon: "arrow.down.circle", title: "全量更新") {
+                    runPriceUpdate("--update-prices", "全量更新中…")
+                }
+                .disabled(priceUpdating)
+
+                settingsActionButton(icon: "magnifyingglass.circle", title: "查漏补缺") {
+                    runPriceUpdate("--update-unknown", "查漏补缺中…")
+                }
+                .disabled(priceUpdating)
+
+                if priceUpdating { ProgressView().controlSize(.mini) }
+            }
+
+            if !priceResult.isEmpty && !priceUpdating {
+                Text(priceResult)
+                    .font(.system(size: 9))
+                    .foregroundStyle(Theme.tTertiary)
+                    .lineLimit(2)
+                    .onTapGesture { priceResult = "" }
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
+                            priceResult = ""
+                        }
+                    }
+            }
+        }
+    }
+
+    var settingsDiagnosticsSection: some View {
+        settingsSection("stethoscope", "诊断") {
+            HStack(spacing: 8) {
+                settingsActionButton(
+                    icon: debugOutput.isEmpty || debugRunning ? "ladybug" : "chevron.up.circle",
+                    title: debugButtonTitle
+                ) {
+                    toggleDiagnostics()
+                }
+                .disabled(debugRunning)
+
+                if debugRunning { ProgressView().controlSize(.mini) }
+
+                Spacer()
+
+                if !debugOutput.isEmpty {
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(debugOutput, forType: .string)
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.tTertiary)
+                            .frame(width: 22, height: 22)
+                            .background(Circle().fill(Color.primary.opacity(0.06)))
+                    }
+                    .buttonStyle(.plain)
+                    .tip("复制诊断")
+                }
+            }
+
+            if !debugOutput.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) { debugExpanded.toggle() }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: debugExpanded ? "chevron.down" : "chevron.right")
+                                .font(.system(size: 8, weight: .semibold))
+                            Text(debugSummary)
+                                .font(.system(size: 9, design: .monospaced))
+                                .lineLimit(1)
+                            Spacer()
+                        }
+                        .foregroundStyle(Theme.tSecondary)
+                    }
+                    .buttonStyle(.plain)
+
+                    if debugExpanded {
+                        Text(debugOutput)
+                            .font(.system(size: 8.5, design: .monospaced))
+                            .foregroundStyle(Theme.tSecondary)
+                            .lineLimit(16)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.primary.opacity(0.05)))
+            }
+        }
+    }
+
+    var settingsReminderSection: some View {
+        settingsSection("figure.walk.circle", "久坐提醒") {
+            settingsToggleRow("启用", isOn: $sitReminderOn)
+                .onChange(of: sitReminderOn) { _ in store.sitReminder.updateRunning() }
+
+            if sitReminderOn {
+                HStack {
+                    Text("间隔").font(.system(size: 10)).foregroundStyle(Theme.tTertiary)
+                    Spacer()
+                    Picker("", selection: $sitReminderInterval) {
+                        Text("45m").tag(45); Text("60m").tag(60); Text("90m").tag(90)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 130)
+                    .controlSize(.mini)
+                    .onChange(of: sitReminderInterval) { _ in store.sitReminder.updateRunning() }
+                }
+
+                settingsActionButton(icon: "bell.badge", title: "测试提醒") {
+                    store.sitReminder.testPing()
+                }
+
+                Text("基于系统空闲判断连续用机时长,看视频或开会不操作会被当作离开。")
+                    .font(.system(size: 8.5))
+                    .foregroundStyle(Theme.tTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    var settingsSyncSection: some View {
+        settingsSection("arrow.triangle.2.circlepath", "多设备同步") {
+            settingsToggleRow("启用", isOn: $store.syncEnabled)
+                .onChange(of: store.syncEnabled) { on in
+                    if on { setupSync() } else { store.stopAutoSync() }
+                }
+
+            if store.syncEnabled {
+                settingsValueRow("设备名") {
+                    TextField("hostname", text: $deviceName)
+                        .font(.system(size: 10, design: .monospaced))
+                        .textFieldStyle(.plain)
+                        .frame(width: 110)
+                        .multilineTextAlignment(.trailing)
+                        .onChange(of: deviceName) { _ in saveSync() }
+                }
+
+                settingsValueRow("目录") {
+                    Text(syncDir.isEmpty ? "未设置" : (syncDir as NSString).lastPathComponent)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(syncDir.isEmpty ? Theme.tTertiary : Theme.tSecondary)
+                        .lineLimit(1)
+                    Button("选择") { pickSyncDir() }
+                        .font(.system(size: 10))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Theme.claude)
+                }
+
+                HStack(spacing: 8) {
+                    settingsActionButton(icon: "arrow.triangle.2.circlepath", title: store.syncing ? "同步中" : "同步") {
+                        store.doSync()
+                    }
+                    .disabled(store.syncing || syncDir.isEmpty)
+
+                    Spacer()
+                    Text("自动").font(.system(size: 10)).foregroundStyle(Theme.tTertiary)
+                    Toggle("", isOn: $autoSync)
+                        .toggleStyle(.switch).controlSize(.mini).labelsHidden()
+                        .onChange(of: autoSync) { on in
+                            if on { store.startAutoSync(minutes: syncInterval) }
+                            else { store.stopAutoSync() }
+                        }
+                    if autoSync {
+                        Picker("", selection: $syncInterval) {
+                            Text("1m").tag(1); Text("5m").tag(5); Text("15m").tag(15)
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 90)
+                        .controlSize(.mini)
+                        .onChange(of: syncInterval) { v in store.startAutoSync(minutes: v) }
+                    }
+                }
+
+                settingsValueRow("展示") {
+                    Picker("", selection: $store.showAllDevices) {
+                        Text("本机").tag(false); Text("全部设备").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 120)
+                    .controlSize(.mini)
+                }
+
+                deviceStatusBlock
+
+                if store.syncEnabled && !syncDir.isEmpty {
+                    let dataRepo = Self.gitRemoteUrl(syncDir)
+                    let hasRemote = !dataRepo.contains("未配置")
+                    Rectangle().fill(Color.primary.opacity(0.06)).frame(height: 1)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "plus.circle")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Theme.hermes)
+                            Text("添加设备")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Theme.tSecondary)
+                        }
+
+                        if hasRemote {
+                            Text("另一台 Mac").font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.tSecondary)
+                            Text("安装 Tokei.app 后选择同一个数据仓库")
+                                .font(.system(size: 8.5)).foregroundStyle(Theme.tTertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Rectangle().fill(Color.primary.opacity(0.04)).frame(height: 1)
+                            Text("远程 Linux").font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.tSecondary)
+                            copyBlock("git clone \(dataRepo) ~/.tokei/sync && cp ~/.tokei/sync/usage.30s.py ~/.tokei/ 2>/dev/null; echo '{\"sync_dir\":\"~/.tokei/sync\",\"device_id\":\"'$(hostname -s)'\"}' > ~/.tokei/config.json && (crontab -l 2>/dev/null; echo '*/5 * * * * cd ~/.tokei/sync && python3 ~/.tokei/usage.30s.py --json >/dev/null && git pull -q && git add -A && git diff --cached --quiet || git commit -qm sync && git push -q') | crontab -")
+                        } else {
+                            Text("数据目录未关联 Git 仓库")
+                                .font(.system(size: 9)).foregroundStyle(Theme.tTertiary)
+                            copyBlock("读取 \(Self.skillPath) 并帮我创建 Tokei 私有数据仓库,配置多设备同步")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    var settingsRemoteHintSection: some View {
+        settingsSection("antenna.radiowaves.left.and.right", "远程采集") {
+            Text("多台 Mac 或远程服务器的数据可通过私有 Git 仓库同步,每台设备独立采集、自动加和。")
+                .font(.system(size: 9))
+                .foregroundStyle(Theme.tTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+            copyBlock("读取 \(Self.skillPath) 帮我配置 Tokei 多设备同步")
+        }
+    }
+
+    var deviceStatusBlock: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 5) {
+                Image(systemName: "desktopcomputer")
+                    .font(.system(size: 8)).foregroundStyle(.green)
+                Text(deviceName.isEmpty ? "本机" : deviceName)
+                    .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.tPrimary)
+                Text("(本机)").font(.system(size: 9)).foregroundStyle(Theme.tTertiary)
+            }
+            if store.peers.isEmpty {
+                HStack(spacing: 5) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 8)).foregroundStyle(Theme.tTertiary)
+                    Text("等待其他设备…")
+                        .font(.system(size: 10)).foregroundStyle(Theme.tTertiary)
+                }
+            } else {
+                ForEach(store.peers) { p in
+                    HStack(spacing: 5) {
+                        Image(systemName: "laptopcomputer")
+                            .font(.system(size: 8)).foregroundStyle(Theme.codex)
+                        Text(p.deviceId)
+                            .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.tPrimary)
+                        Spacer()
+                        Text(Fmt.reset(Int(p.lastSync.timeIntervalSince1970)))
+                            .font(.system(size: 9, design: .monospaced)).foregroundStyle(Theme.tTertiary)
+                    }
+                }
+            }
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
+            .fill(Color.primary.opacity(0.04)))
+    }
+
+    var settingsHeader: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle().fill(Theme.claude.opacity(0.16))
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.claude)
+            }
+            .frame(width: 30, height: 30)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("设置")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(Theme.tPrimary)
+                Text("显示、同步和诊断")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(Theme.tTertiary)
+            }
+            Spacer()
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) { mode = .cards }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Theme.tTertiary)
+                    .frame(width: 24, height: 24)
+                    .background(Circle().fill(Color.primary.opacity(0.06)))
+            }
+            .buttonStyle(.plain)
+            .tip("关闭设置")
+        }
+        .padding(.bottom, 2)
     }
 
     func settingsSection<C: View>(_ icon: String, _ title: String, @ViewBuilder content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Theme.tTertiary)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Theme.claude.opacity(0.95))
+                    .frame(width: 20, height: 20)
+                    .background(Circle().fill(Theme.claude.opacity(0.10)))
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.tSecondary)
             }
-            VStack(spacing: 2) { content() }
+            VStack(spacing: 6) { content() }
         }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(Color.black.opacity(0.16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.7)
+                )
+        )
+    }
+
+    func settingsActionButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: icon).font(.system(size: 9))
+                Text(title).font(.system(size: 10, weight: .medium))
+            }
+            .foregroundStyle(Theme.tPrimary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color.primary.opacity(0.08)))
+        }
+        .buttonStyle(.plain)
+    }
+
+    func settingsToggleRow(_ title: String, isOn: Binding<Bool>) -> some View {
+        HStack {
+            Text(title).font(.system(size: 11)).foregroundStyle(Theme.tPrimary)
+            Spacer()
+            Toggle("", isOn: isOn)
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .labelsHidden()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(Color.primary.opacity(0.04)))
+    }
+
+    func settingsValueRow<C: View>(_ title: String, @ViewBuilder value: () -> C) -> some View {
+        HStack(spacing: 8) {
+            Text(title).font(.system(size: 10)).foregroundStyle(Theme.tTertiary)
+            Spacer()
+            value()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
     }
 
     func setupSync() {
