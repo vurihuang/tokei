@@ -43,6 +43,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 PLIST
 
 codesign --force --deep --sign - "$APP" 2>/dev/null || true
+xattr -cr "$APP" 2>/dev/null || true
 echo "Built: $(pwd)/$APP"
 
 # 打包 DMG

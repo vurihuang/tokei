@@ -49,7 +49,8 @@ Tokei is a **macOS menu bar app** that tracks usage, cost, and performance acros
 # Download and install
 curl -LO https://dl.lanshuagent.com/tokei/Tokei.dmg
 open Tokei.dmg
-# Drag Tokei.app to Applications
+# Drag Tokei.app to Applications, then remove quarantine flag:
+sudo xattr -rd com.apple.quarantine /Applications/Tokei.app
 ```
 
 Or build from source:
