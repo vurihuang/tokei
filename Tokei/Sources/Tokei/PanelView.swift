@@ -603,7 +603,7 @@ struct PanelView: View {
     }
 
     var disclaimer: some View {
-        Text("成本按 API 价估算,非订阅实付")
+        Text(mode == .settings ? "Made by 岚叔" : "成本按 API 价估算,非订阅实付")
             .font(.system(size: 9))
             .foregroundStyle(Theme.tTertiary)
     }
@@ -714,14 +714,6 @@ struct PanelView: View {
                 .frame(maxWidth: .infinity, alignment: .top)
             }
 
-            HStack {
-                Spacer()
-                Text("Made by 岚叔")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(Theme.tTertiary)
-                Spacer()
-            }
-            .padding(.top, 2)
         }
         .onAppear {
             if let cfg = SyncManager.loadConfig() {

@@ -3,3 +3,6 @@
 *.dmg
 .DS_Store
 __pycache__/
+.wrangler/
+.playwright-mcp/
+*.png
