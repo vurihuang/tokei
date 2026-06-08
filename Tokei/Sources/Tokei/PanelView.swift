@@ -719,13 +719,19 @@ struct PanelView: View {
         .onAppear {
             if let cfg = SyncManager.loadConfig() {
                 if syncDir.isEmpty && !cfg.sync_dir.isEmpty {
-                    syncDir = (cfg.sync_dir as NSString).expandingTildeInPath
+                    let expanded = (cfg.sync_dir as NSString).expandingTildeInPath
+                    if FileManager.default.fileExists(atPath: expanded) {
+                        syncDir = expanded
+                    }
                 }
                 if deviceName.isEmpty && !cfg.device_id.isEmpty {
                     deviceName = cfg.device_id
                 }
                 if !store.syncEnabled && !cfg.sync_dir.isEmpty {
-                    store.syncEnabled = true
+                    let expanded = (cfg.sync_dir as NSString).expandingTildeInPath
+                    if FileManager.default.fileExists(atPath: expanded) {
+                        store.syncEnabled = true
+                    }
                 }
                 if let auto = cfg.auto_sync { autoSync = auto }
                 if let interval = cfg.sync_interval { syncInterval = interval }
@@ -947,6 +953,7 @@ struct PanelView: View {
                 if store.syncEnabled {
                     let dataRepo = cachedRemoteUrl
                     let hasRemote = !dataRepo.isEmpty && !dataRepo.contains("未配置")
+                        && (dataRepo.hasPrefix("http") || dataRepo.hasPrefix("git@") || dataRepo.hasPrefix("ssh://"))
                     Rectangle().fill(Color.primary.opacity(0.06)).frame(height: 1)
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 5) {
