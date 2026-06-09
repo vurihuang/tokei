@@ -603,7 +603,7 @@ struct PanelView: View {
     }
 
     var disclaimer: some View {
-        Text(mode == .settings ? "Made by 岚叔" : "成本按 API 价估算,非订阅实付")
+        Text(mode == .settings ? "Made by lank" : "成本按 API 价估算,非订阅实付")
             .font(.system(size: 9))
             .foregroundStyle(Theme.tTertiary)
     }
@@ -977,7 +977,7 @@ struct PanelView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                             Rectangle().fill(Color.primary.opacity(0.04)).frame(height: 1)
                             Text("远程 Linux").font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.tSecondary)
-                            copyBlock("git clone \(dataRepo) ~/.tokei/sync && cp ~/.tokei/sync/usage.30s.py ~/.tokei/ 2>/dev/null; echo '{\"sync_dir\":\"~/.tokei/sync\",\"device_id\":\"'$(hostname -s)'\"}' > ~/.tokei/config.json && (crontab -l 2>/dev/null; echo '*/5 * * * * cd ~/.tokei/sync && python3 ~/.tokei/usage.30s.py --json >/dev/null && git pull -q && git add -A && git diff --cached --quiet || git commit -qm sync && git push -q') | crontab -")
+                            copyBlock("git clone \(dataRepo) ~/.tokei/sync && curl -fsSL https://dl.lanshuagent.com/tokei/usage.30s.py -o ~/.tokei/usage.30s.py && echo '{\"sync_dir\":\"~/.tokei/sync\",\"device_id\":\"'$(hostname -s)'\"}' > ~/.tokei/config.json && (crontab -l 2>/dev/null; echo '*/5 * * * * cd ~/.tokei/sync && python3 ~/.tokei/usage.30s.py --json >/dev/null && git pull -q && git add -A && git diff --cached --quiet || git commit -qm sync && git push -q') | crontab -")
                         } else {
                             Text("数据目录未关联 Git 仓库")
                                 .font(.system(size: 9)).foregroundStyle(Theme.tTertiary)
@@ -1254,7 +1254,7 @@ struct PanelView: View {
     static let buildVersion = "2026.0609"
 
     static var skillPath: String {
-        return "~/.tokei/skills/tokei-setup.md"
+        return "https://raw.githubusercontent.com/cclank/tokei/main/skills/tokei-setup.md"
     }
 
     static func gitRemoteUrl(_ dir: String) -> String {

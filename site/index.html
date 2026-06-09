@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tokei 時計 — AI Coding Usage Monitor for macOS</title>
 <meta name="description" content="Tokei is a macOS menu bar app that tracks usage, cost and performance across 8 AI coding tools. Privacy-first, real-time, beautiful.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://tokei.lanshuagent.com/">
+<meta property="og:title" content="Tokei 時計 — AI Coding Usage Monitor">
+<meta property="og:description" content="Track usage, cost, and performance across 8 AI coding tools from your macOS menu bar. Free & open-source.">
+<meta property="og:image" content="https://tokei.lanshuagent.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Tokei 時計 — AI Coding Usage Monitor">
+<meta name="twitter:description" content="Track usage, cost, and performance across 8 AI coding tools from your macOS menu bar.">
+<meta name="twitter:image" content="https://tokei.lanshuagent.com/og.png">
+<link rel="canonical" href="https://tokei.lanshuagent.com/">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>時</text></svg>">
 <style>
 /* ═══════════════════════════════════════════════════════
@@ -470,6 +480,7 @@ nav .container{display:flex;align-items:center;justify-content:space-between}
 @media(max-width:768px){
   .how-steps{grid-template-columns:1fr;gap:32px}
   .how-steps::before{display:none}
+  #help>div>div:last-child{grid-template-columns:1fr!important}
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -579,11 +590,12 @@ body::after{
         <a href="#tools"><span class="en">Tools</span><span class="zh">工具</span></a>
         <a href="#how"><span class="en">How It Works</span><span class="zh">工作原理</span></a>
         <a href="#privacy"><span class="en">Privacy</span><span class="zh">隐私</span></a>
+        <a href="#help"><span class="en">Help</span><span class="zh">帮助</span></a>
       </div>
       <button class="lang-btn" onclick="toggleLang()">
         <span class="en">中文</span><span class="zh">EN</span>
       </button>
-      <a href="#download" class="nav-cta">
+      <a href="https://dl.lanshuagent.com/tokei/Tokei-v8.dmg" class="nav-cta">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1v10M4 7l4 4 4-4M2 14h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="en">Download</span><span class="zh">下载</span>
       </a>
@@ -628,7 +640,7 @@ body::after{
     </p>
 
     <div class="hero-btns rv rv-d4">
-      <a href="#download" class="btn-p">
+      <a href="https://dl.lanshuagent.com/tokei/Tokei-v8.dmg" class="btn-p">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1v10M4 7l4 4 4-4M2 14h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="en">Download for Mac</span><span class="zh">下载 macOS 版</span>
       </a>
@@ -995,6 +1007,87 @@ body::after{
   </div>
 </section>
 
+<!-- ═══ HELP ═══ -->
+<section class="how" id="help" style="background:var(--bg2)">
+  <div class="container">
+    <div class="sec-centered rv">
+      <div class="sec-label"><span class="en">Help</span><span class="zh">帮助</span></div>
+      <h2 class="sec-title">
+        <span class="en">Get started in minutes</span>
+        <span class="zh">几分钟即可上手</span>
+      </h2>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:48px">
+      <!-- 安装说明 -->
+      <div class="vault rv" style="text-align:left;max-width:none;padding:36px 32px">
+        <h3 style="font-size:20px;font-weight:700;margin-bottom:18px;display:flex;align-items:center;gap:10px">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--coral)" stroke-width="2" stroke-linecap="round"><path d="M8 1v10M4 7l4 4 4-4M2 14h12" transform="translate(4,2) scale(0.9)"/><rect x="2" y="17" width="20" height="5" rx="2"/></svg>
+          <span class="en">Installation</span><span class="zh">安装说明</span>
+        </h3>
+        <ol style="font-size:15px;color:var(--t2);line-height:2;padding-left:20px">
+          <li>
+            <span class="en">Download the DMG and open it</span>
+            <span class="zh">下载 DMG 文件并打开</span>
+          </li>
+          <li>
+            <span class="en">Drag <strong style="color:var(--t1)">Tokei.app</strong> into the <strong style="color:var(--t1)">Applications</strong> folder</span>
+            <span class="zh">将 <strong style="color:var(--t1)">Tokei.app</strong> 拖入 <strong style="color:var(--t1)">Applications</strong> 文件夹</span>
+          </li>
+          <li>
+            <span class="en">If macOS blocks the first launch, open Terminal and run: <code style="background:rgba(235,133,102,.12);color:var(--coral);padding:2px 8px;border-radius:4px;font-size:13px">sudo xattr -rd com.apple.quarantine /Applications/Tokei.app</code></span>
+            <span class="zh">如果首次打开被系统拦截，打开终端运行：<code style="background:rgba(235,133,102,.12);color:var(--coral);padding:2px 8px;border-radius:4px;font-size:13px">sudo xattr -rd com.apple.quarantine /Applications/Tokei.app</code></span>
+          </li>
+          <li>
+            <span class="en">Launch Tokei — it appears in the menu bar and starts tracking automatically</span>
+            <span class="zh">启动 Tokei —— 它会出现在菜单栏，自动开始追踪</span>
+          </li>
+        </ol>
+        <p style="font-size:13px;color:var(--t3);margin-top:14px">
+          <span class="en">That's it. No account, no API key, no configuration needed.</span>
+          <span class="zh">就这么简单。无需账号、无需 API 密钥、无需任何配置。</span>
+        </p>
+      </div>
+
+      <!-- 多设备同步说明 -->
+      <div class="vault rv rv-d2" style="text-align:left;max-width:none;padding:36px 32px">
+        <h3 style="font-size:20px;font-weight:700;margin-bottom:18px;display:flex;align-items:center;gap:10px">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+          <span class="en">Multi-device Sync</span><span class="zh">多设备同步</span>
+        </h3>
+        <ol style="font-size:15px;color:var(--t2);line-height:2;padding-left:20px">
+          <li>
+            <span class="en">Create a <strong style="color:var(--t1)">private Git repository</strong> on GitHub (or any Git host)</span>
+            <span class="zh">在 GitHub（或其他 Git 平台）创建一个<strong style="color:var(--t1)">私有仓库</strong></span>
+          </li>
+          <li>
+            <span class="en">Clone the repo to your Mac, then open Tokei → Settings → Multi-device Sync → Enable → select the repo folder</span>
+            <span class="zh">将仓库克隆到 Mac，打开 Tokei → 设置 → 多设备同步 → 开启 → 选择仓库目录</span>
+          </li>
+          <li>
+            <span class="en">On remote Linux servers: clone the same repo, install the collection script, set up a cron job for auto-sync every 5 minutes</span>
+            <span class="zh">远程 Linux 服务器：克隆同一仓库，安装采集脚本，配置 cron 每 5 分钟自动同步</span>
+          </li>
+          <li>
+            <span class="en">Each device collects data independently — Tokei merges them automatically</span>
+            <span class="zh">每台设备独立采集数据 —— Tokei 自动聚合展示</span>
+          </li>
+        </ol>
+        <p style="font-size:13px;color:var(--t3);margin-top:14px;margin-bottom:12px">
+          <span class="en">Or let AI set it all up — copy this prompt into <strong style="color:var(--t2)">Claude Code</strong>:</span>
+          <span class="zh">或者让 AI 帮你完成全部配置 —— 复制以下提示词到 <strong style="color:var(--t2)">Claude Code</strong>：</span>
+        </p>
+        <div style="position:relative;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-size:13px;color:var(--t2);line-height:1.5;cursor:pointer" onclick="navigator.clipboard.writeText(this.querySelector('.cp-text').textContent);this.querySelector('.cp-ok').style.opacity=1;setTimeout(()=>this.querySelector('.cp-ok').style.opacity=0,1500)">
+          <span class="cp-text"><span class="en">Read https://raw.githubusercontent.com/cclank/tokei/main/skills/tokei-setup.md and help me set up Tokei multi-device sync</span><span class="zh">读取 https://raw.githubusercontent.com/cclank/tokei/main/skills/tokei-setup.md 帮我配置 Tokei 多设备同步</span></span>
+          <span class="cp-ok" style="position:absolute;top:8px;right:12px;font-size:11px;color:var(--emerald);opacity:0;transition:opacity .3s">✓ <span class="en">Copied</span><span class="zh">已复制</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="div-diamond"></div>
+
 <!-- ═══ CTA ═══ -->
 <section class="cta" id="download">
   <div class="cta-fluid"></div>
@@ -1008,7 +1101,7 @@ body::after{
       <span class="zh">免费、开源，为在意自己工具的开发者而建。</span>
     </p>
     <div class="hero-btns" style="margin-top:44px">
-      <a href="https://dl.lanshuagent.com/tokei/Tokei-v5.dmg" class="btn-p" target="_blank" rel="noopener">
+      <a href="https://dl.lanshuagent.com/tokei/Tokei-v8.dmg" class="btn-p" target="_blank" rel="noopener">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1v10M4 7l4 4 4-4M2 14h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="en">Download for macOS</span><span class="zh">下载 macOS 版</span>
       </a>

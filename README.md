@@ -10,50 +10,84 @@
 <h1 align="center">⏱ Tokei 時計</h1>
 
 <p align="center">
-  <strong>AI Coding Usage Monitor for macOS</strong><br>
+  <strong>macOS 菜单栏 AI 编程用量监控</strong><br>
   <sub>了然于心，掌控全局。</sub><br><br>
-  <a href="https://tokei.lanshuagent.com">🌐 Homepage</a> · <a href="https://dl.lanshuagent.com/tokei/Tokei-v5.dmg">⬇️ Download</a>
+  <a href="https://tokei.lanshuagent.com">🌐 官网</a> · <a href="https://dl.lanshuagent.com/tokei/Tokei-v8.dmg">⬇️ 下载</a> · <a href="#english">English</a>
 </p>
 
 ---
 
-## What is Tokei?
+## 什么是 Tokei？
 
-Tokei is a **macOS menu bar app** that tracks usage, cost, and performance across **8 AI coding tools** in real-time — all from local log files, with zero network traffic.
+Tokei 是一款 **macOS 菜单栏应用**，实时追踪你在 **8 款 AI 编程工具** 上的用量、成本和性能——全部基于本地日志，零网络流量。
 
-| Tool | Metrics |
-|------|---------|
-| **Claude Code** | Tokens (in/out/cache), cost, quota, models |
-| **Codex CLI** | Tokens, cost, quota, sessions |
-| **Gemini CLI** | Tokens, thoughts, cost, models |
-| **Grok CLI** | Tokens, sessions, context |
-| **Aider (Hermes)** | Tokens, cost, cache hit, models |
-| **OpenClaw** | Tokens, cost, tasks, models |
-| **OpenCode** | Tokens, cost, cache hit, models |
-| **Qoder** | Tokens, calls, quota |
+### 支持的工具
 
-## Features
+| 工具 | 追踪指标 |
+|------|----------|
+| **Claude Code** | Token（输入/输出/缓存）、成本、配额、模型 |
+| **Codex CLI** | Token、成本、配额、会话 |
+| **Gemini CLI** | Token、思考量、成本、模型 |
+| **Grok CLI** | Token、会话、上下文 |
+| **Aider (Hermes)** | Token、成本、缓存命中率、模型 |
+| **OpenClaw** | Token、成本、任务、模型 |
+| **OpenCode** | Token、成本、缓存命中率、模型 |
+| **Qoder** | Token、调用次数、配额 |
 
-- **Real-time monitoring** — 30s auto-refresh, menu bar quota display
-- **Cost estimation** — Per-model pricing via external `pricing.json`, auto-updatable
-- **Multi-device sync** — Git-based sync across Mac + Linux servers
-- **Time ranges** — Today / Yesterday / Week / Last Week / Month / Year
-- **Dashboard** — Daily cost chart, weekly heatmap, tool breakdown
-- **Privacy-first** — Reads local logs only, never phones home
-- **Wrapped** — Annual review of your AI coding journey
-- **Sit reminder** — Idle-aware break notifications
+## 功能一览
 
-## Quick Start
+### 实时监控
+- 30 秒自动刷新，菜单栏直接显示配额/用量
+- 按工具展示卡片，一眼掌握所有 AI 工具状态
+
+### 成本估算
+- 基于 API 实际定价估算成本（非订阅费用）
+- 317 个模型价格表（来源 OpenRouter），支持一键更新
+- 本地价格覆盖（`pricing_overrides.json`），更新不丢失
+- 未知模型按家族关键词回退，兜底用 Opus 价格（保守上限）
+
+### 数据面板
+- 每日成本折线图
+- 每周热力图
+- 工具用量占比分析
+
+### 时间维度
+- 今天 / 昨天 / 本周 / 上周 / 本月 / 今年
+- 随时切换，对比不同时段用量趋势
+
+### 项目追踪
+- 按项目维度查看 Claude Code 用量
+- 了解每个项目消耗了多少 Token 和成本
+
+### 多设备同步
+- 基于 Git 的跨设备同步（Mac + Linux 服务器）
+- Mac 端设置里一键开启
+- 远程 Linux 服务器支持 crontab 自动采集和同步
+- 也可以让 Claude Code 帮你自动完成全部配置
+
+### 年度回顾（Wrapped）
+- 回顾你一整年的 AI 编程旅程
+- 总用量、总成本、高峰日、工具偏好等统计
+
+### 久坐提醒
+- 感知空闲状态，智能提醒休息
+- 可自定义间隔时间
+
+### 隐私优先
+- 仅读取本地日志文件，从不联网上报
+- 唯一的网络操作：手动执行 `--update-prices` 更新价格表
+
+## 快速开始
 
 ```bash
-# Download and install
-curl -LO https://dl.lanshuagent.com/tokei/Tokei-v5.dmg
+# 下载安装
+curl -LO https://dl.lanshuagent.com/tokei/Tokei-v8.dmg
 open Tokei.dmg
-# Drag Tokei.app to Applications, then remove quarantine flag:
+# 拖动 Tokei.app 到应用程序文件夹，然后解除隔离：
 sudo xattr -rd com.apple.quarantine /Applications/Tokei.app
 ```
 
-Or build from source:
+或从源码构建：
 
 ```bash
 git clone https://github.com/cclank/tokei.git
@@ -62,29 +96,27 @@ bash package.sh
 open Tokei.app
 ```
 
-## Architecture
+## 多设备同步配置
 
-```
-usage.30s.py              # Python collector — scans local logs, outputs JSON
-pricing.json              # Model pricing table (--update-prices to refresh)
-pricing_overrides.json    # Local price overrides (not overwritten on refresh)
-Tokei/
-├── Sources/Tokei/
-│   ├── Model.swift       # Data models (Usage, *Range, *Stat)
-│   ├── PanelView.swift   # Main UI — cards, settings, footer
-│   ├── DataLoader.swift  # Runs Python script, decodes JSON
-│   ├── SyncManager.swift # Multi-device merge via Git
-│   ├── DashboardView.swift
-│   ├── Design.swift      # Theme, colors, shared components
-│   └── main.swift        # App entry, menu bar, status item
-└── package.sh            # Build + package into .app/.dmg
+Tokei 支持通过私有 Git 仓库在多台机器间同步用量数据。
+
+**Mac 端：** 打开设置 → 多设备同步 → 开启，选择一个 Git 仓库目录。
+
+**远程 Linux 服务器：**
+
+```bash
+git clone <你的私有仓库> ~/.tokei/sync
+curl -fsSL https://dl.lanshuagent.com/tokei/usage.30s.py -o ~/.tokei/usage.30s.py
+echo '{"sync_dir":"~/.tokei/sync","device_id":"'$(hostname -s)'"}' > ~/.tokei/config.json
+# 每 5 分钟自动采集并同步
+(crontab -l 2>/dev/null; echo '*/5 * * * * cd ~/.tokei/sync && python3 ~/.tokei/usage.30s.py --json >/dev/null && git pull -q && git add -A && git diff --cached --quiet || git commit -qm sync && git push -q') | crontab -
 ```
 
-## Data Sources
+## 数据来源
 
-All data is read from **local log files only**. No network, no API calls (except the explicit `--update-prices` command).
+所有数据均来自 **本地日志文件**，无网络请求。
 
-| Tool | Log Path |
+| 工具 | 日志路径 |
 |------|----------|
 | Claude Code | `~/.claude/projects/<proj>/<session>.jsonl` |
 | Codex CLI | `~/.codex/sessions/YYYY/MM/DD/*.jsonl` |
@@ -95,32 +127,6 @@ All data is read from **local log files only**. No network, no API calls (except
 | OpenCode | `~/.opencode/sessions/*.json` |
 | Qoder | `~/.qodo-ai/sessions/*.jsonl` |
 
-## Cost Estimation
-
-Costs are **estimated at API prices**, not subscription fees. The pricing table is external (`pricing.json`, sourced from OpenRouter) and can be refreshed:
-
-```bash
-python3 usage.30s.py --update-prices   # Only networked action in the entire tool
-```
-
-Local overrides go in `pricing_overrides.json` (preserved across updates). Unknown models fall back by family keyword, then to Opus pricing (conservative upper bound).
-
-## Multi-Device Sync
-
-Tokei supports syncing usage data from multiple machines via a private Git repo.
-
-**On your Mac:** Open Settings → Multi-device Sync → Enable, then select a sync directory (a Git repo).
-
-**On a remote Linux server:**
-
-```bash
-git clone <your-private-repo> ~/.tokei/sync
-cp ~/.tokei/sync/usage.30s.py ~/.tokei/
-echo '{"sync_dir":"~/.tokei/sync","device_id":"'$(hostname -s)'"}' > ~/.tokei/config.json
-# Auto-sync every 5 minutes
-(crontab -l 2>/dev/null; echo '*/5 * * * * cd ~/.tokei/sync && python3 ~/.tokei/usage.30s.py --json >/dev/null && git pull -q && git add -A && git diff --cached --quiet || git commit -qm sync && git push -q') | crontab -
-```
-
 ## Star History
 
 <p align="center">
@@ -128,6 +134,20 @@ echo '{"sync_dir":"~/.tokei/sync","device_id":"'$(hostname -s)'"}' > ~/.tokei/co
     <img src="https://api.star-history.com/svg?repos=cclank/tokei&type=Date" width="600" alt="Star History Chart">
   </a>
 </p>
+
+---
+
+<a id="english"></a>
+
+## English
+
+Tokei is a **macOS menu bar app** that tracks usage, cost, and performance across **8 AI coding tools** in real-time — all from local log files, with zero network traffic.
+
+**Features:** Real-time monitoring (30s refresh) · Cost estimation (317 models, OpenRouter pricing) · Dashboard (daily chart, weekly heatmap) · Time ranges (today/week/month/year) · Project-level tracking · Multi-device sync (Git-based, Mac + Linux) · Annual Wrapped · Sit reminder · Privacy-first (local logs only)
+
+**Supported tools:** Claude Code, Codex CLI, Gemini CLI, Grok CLI, Aider, OpenClaw, OpenCode, Qoder
+
+For full documentation, visit [tokei.lanshuagent.com](https://tokei.lanshuagent.com).
 
 ## License
 
