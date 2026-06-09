@@ -57,7 +57,7 @@ final class SyncManager {
         guard let files = try? fm.contentsOfDirectory(atPath: dir) else { return [] }
         for file in files where file.hasSuffix(".json") {
             let deviceId = String(file.dropLast(5)) // remove .json
-            if deviceId == cfg.device_id { continue }
+            if deviceId.caseInsensitiveCompare(cfg.device_id) == .orderedSame { continue }
             let path = (dir as NSString).appendingPathComponent(file)
             guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { continue }
             guard let raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

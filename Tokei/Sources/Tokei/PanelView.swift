@@ -1138,7 +1138,12 @@ struct PanelView: View {
     }
 
     func setupSync() {
-        if deviceName.isEmpty { deviceName = ProcessInfo.processInfo.hostName.components(separatedBy: ".").first ?? "mac" }
+        if deviceName.isEmpty {
+            var buf = [CChar](repeating: 0, count: 256)
+            gethostname(&buf, buf.count)
+            let raw = String(cString: buf)
+            deviceName = raw.components(separatedBy: ".").first ?? "mac"
+        }
         saveSync()
     }
 
