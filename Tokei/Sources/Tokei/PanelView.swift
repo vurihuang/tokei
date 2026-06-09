@@ -682,6 +682,7 @@ struct PanelView: View {
         }
     }
 
+    @StateObject private var updater = Updater()
     @State private var priceUpdating = false
     @State private var priceResult = ""
     @State private var debugRunning = false
@@ -717,6 +718,7 @@ struct PanelView: View {
 
         }
         .onAppear {
+            updater.checkForUpdate()
             if let cfg = SyncManager.loadConfig() {
                 if syncDir.isEmpty && !cfg.sync_dir.isEmpty {
                     let expanded = (cfg.sync_dir as NSString).expandingTildeInPath
@@ -1051,6 +1053,7 @@ struct PanelView: View {
                     Text("v\(Self.buildVersion)")
                         .font(.system(size: 8, design: .monospaced))
                         .foregroundStyle(Theme.tTertiary.opacity(0.6))
+                    updateBadge
                 }
                 Text("显示、同步和诊断")
                     .font(.system(size: 9.5))
@@ -1070,6 +1073,46 @@ struct PanelView: View {
             .tip("关闭设置")
         }
         .padding(.bottom, 2)
+    }
+
+    @ViewBuilder
+    private var updateBadge: some View {
+        switch updater.state {
+        case .checking:
+            ProgressView()
+                .controlSize(.mini)
+        case .available(let tag, _):
+            Button {
+                updater.performUpdate()
+            } label: {
+                Text("\(tag) 可更新")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(.green))
+            }
+            .buttonStyle(.plain)
+        case .downloading(let p):
+            HStack(spacing: 4) {
+                ProgressView(value: p)
+                    .frame(width: 40)
+                Text("\(Int(p * 100))%")
+                    .font(.system(size: 8, design: .monospaced))
+                    .foregroundStyle(Theme.tTertiary)
+            }
+        case .installing:
+            Text("安装中…")
+                .font(.system(size: 8))
+                .foregroundStyle(Theme.claude)
+        case .failed(let msg):
+            Text(msg)
+                .font(.system(size: 8))
+                .foregroundStyle(.red)
+                .lineLimit(1)
+        case .idle:
+            EmptyView()
+        }
     }
 
     func settingsSection<C: View>(_ icon: String, _ title: String, @ViewBuilder content: () -> C) -> some View {
