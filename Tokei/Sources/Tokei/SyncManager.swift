@@ -24,6 +24,12 @@ final class SyncManager {
 
     init() { config = Self.loadConfig() }
 
+    static func resolvedSyncDir(_ cfg: SyncConfig) -> String {
+        let raw = cfg.sync_dir.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { return Self.syncDir }
+        return (raw as NSString).expandingTildeInPath
+    }
+
     // MARK: - Config
 
     static func loadConfig() -> SyncConfig? {
@@ -44,7 +50,7 @@ final class SyncManager {
 
     func loadPeers() -> [PeerDevice] {
         guard let cfg = config else { return [] }
-        let dir = Self.syncDir
+        let dir = Self.resolvedSyncDir(cfg)
         guard FileManager.default.fileExists(atPath: dir) else { return [] }
         var peers: [PeerDevice] = []
         let fm = FileManager.default
@@ -162,10 +168,11 @@ final class SyncManager {
 
     func gitSync(completion: @escaping (Bool) -> Void) {
         guard let cfg = config else { completion(false); return }
-        let dir = Self.syncDir
+        let dir = Self.resolvedSyncDir(cfg)
+        let escapedDir = dir.replacingOccurrences(of: "'", with: "'\\''")
         DispatchQueue.global(qos: .utility).async {
             let script = """
-            cd "\(dir)" && \
+            cd '\(escapedDir)' && \
             git pull --rebase --autostash 2>/dev/null; \
             git add -A && \
             (git diff --cached --quiet || git commit -m "tokei sync \(cfg.device_id)") && \
