@@ -89,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.refresh()
         store.sitReminder.updateRunning()
         Updater.shared.checkForUpdate()
-        autoFetchPricingIfNeeded()
+        autoFetchPricing()
         timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             self?.store.refresh()
         }
@@ -150,9 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         b.image = nil
     }
 
-    func autoFetchPricingIfNeeded() {
-        let pricingPath = (NSHomeDirectory() as NSString).appendingPathComponent(".tokei/pricing.json")
-        guard !FileManager.default.fileExists(atPath: pricingPath) else { return }
+    func autoFetchPricing() {
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: "/usr/bin/env")
