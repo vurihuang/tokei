@@ -12,7 +12,7 @@
 <p align="center">
   <strong>macOS 菜单栏 AI 编程用量监控</strong><br>
   <sub>了然于心，掌控全局。</sub><br><br>
-  <a href="https://tokei.lanshuagent.com">🌐 官网</a> · <a href="https://dl.lanshuagent.com/tokei/Tokei-v11.dmg">⬇️ 下载</a> · <a href="#english">English</a>
+  <a href="https://tokei.lanshuagent.com">🌐 官网</a> · <a href="https://github.com/cclank/tokei/releases/latest">⬇️ 下载</a> · <a href="#english">English</a>
 </p>
 
 ---
@@ -144,6 +144,15 @@ echo '{"sync_dir":"~/.tokei/sync","device_id":"'$(hostname -s)'"}' > ~/.tokei/co
 | 数据来源 | 本地日志 | 远程 API |
 
 > CodexBar 在提供商覆盖和配额可见性上表现出色。Tokei 更深入——Token 级分析、成本趋势、项目维度拆分、跨设备同步——全部无需登录。
+
+## 更新日志
+
+### v1.0.1
+- fix: Claude Code 按 message ID 去重，修复重复计数问题
+- fix: Claude Code 扫描 subagent/workflow 日志（之前遗漏）
+- fix: Codex 额度过期后自动归零，解决刷新不及时问题
+- feat: 设置页增加「检查更新」按钮 + "已是最新"反馈
+- fix: 应用内自动更新支持
 
 ## Star History
 
