@@ -682,7 +682,7 @@ struct PanelView: View {
         }
     }
 
-    @StateObject private var updater = Updater()
+    @ObservedObject private var updater = Updater.shared
     @State private var priceUpdating = false
     @State private var priceResult = ""
     @State private var debugRunning = false
@@ -718,7 +718,6 @@ struct PanelView: View {
 
         }
         .onAppear {
-            updater.checkForUpdate()
             if let cfg = SyncManager.loadConfig() {
                 if syncDir.isEmpty && !cfg.sync_dir.isEmpty {
                     let expanded = (cfg.sync_dir as NSString).expandingTildeInPath

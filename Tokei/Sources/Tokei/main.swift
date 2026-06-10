@@ -88,6 +88,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         store.refresh()
         store.sitReminder.updateRunning()
+        Updater.shared.startPeriodicCheck()
         timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             self?.store.refresh()
         }
