@@ -31,7 +31,7 @@ Tokei 是一款 **macOS 菜单栏应用**，实时追踪你在 **9 款 AI 编程
 | **Grok CLI** | Token、会话、上下文 |
 | **Hermes** | Token、成本、缓存命中率、模型 |
 | **OpenClaw** | Token、成本、任务、模型 |
-| **Pi Coding Agent CLI** | Token、成本、缓存命中率、模型、项目 |
+| **Pi Coding Agent CLI / Oh My Pi** | Token、成本、缓存命中率、模型、项目 |
 | **OpenCode** | Token、成本、缓存命中率、模型 |
 | **Qoder** | Token、调用次数、配额 |
 
@@ -124,7 +124,7 @@ echo '{"sync_dir":"~/.tokei/sync","device_id":"'$(hostname -s)'"}' > ~/.tokei/co
 | Grok CLI | `~/.grok/sessions/YYYY/MM/DD/*.jsonl` |
 | Hermes | `~/.hermes/state.db` + `~/.hermes/profiles/*/state.db` |
 | OpenClaw | `~/.openclaw/agents/*/sessions/*.jsonl` + SQLite |
-| Pi Coding Agent CLI | `~/.pi/agent/sessions/<project>/*.jsonl` |
+| Pi Coding Agent CLI / Oh My Pi | `~/.pi/agent/sessions/<project>/*.jsonl` + `~/.omp/agent/sessions/<project>/*.jsonl` |
 | OpenCode | `~/.opencode/sessions/*.json` |
 | Qoder | `~/.qodo-ai/sessions/*.jsonl` |
 
@@ -223,7 +223,7 @@ Tokei is a **macOS menu bar app** that tracks usage, cost, and performance acros
 
 **Features:** Real-time monitoring (30s refresh) · Cost estimation (317 models, OpenRouter pricing) · Dashboard (daily chart, weekly heatmap) · Time ranges (today/week/month/year) · Project-level tracking · Multi-device sync (Git-based, Mac + Linux) · Annual Wrapped · Keep awake · Sit reminder · Privacy-first (local logs only) · [Compare with CodexBar](https://tokei.lanshuagent.com#compare)
 
-**Supported tools:** Claude Code, Codex CLI, Gemini CLI, Grok CLI, Hermes, OpenClaw, Pi Coding Agent CLI, OpenCode, Qoder
+**Supported tools:** Claude Code, Codex CLI, Gemini CLI, Grok CLI, Hermes, OpenClaw, Pi Coding Agent CLI / Oh My Pi, OpenCode, Qoder
 
 For full documentation, visit [tokei.lanshuagent.com](https://tokei.lanshuagent.com).
 
